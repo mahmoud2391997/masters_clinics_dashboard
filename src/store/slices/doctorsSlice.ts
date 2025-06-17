@@ -71,3 +71,4 @@ const doctorsSlice = createSlice({
 
 export const { clearError } = doctorsSlice.actions;
 export default doctorsSlice.reducer;
+export type { DoctorsState}

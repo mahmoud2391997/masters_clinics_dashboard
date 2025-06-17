@@ -75,3 +75,4 @@ const branchesSlice = createSlice({
 
 export const { clearError } = branchesSlice.actions;
 export default branchesSlice.reducer;
+export type { BranchesState };

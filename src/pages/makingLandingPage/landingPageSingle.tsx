@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogActions,
   Paper,
-  Divider,
   Alert,
   CircularProgress,
   Autocomplete,
@@ -25,7 +24,6 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  Tooltip,
   Stack,
 } from '@mui/material';
 import {
@@ -44,7 +42,6 @@ import {
   updateLandingPage,
   deleteLandingPage,
   fetchExistingItems,
-  updateCurrentLandingPageContent,
   updateCurrentLandingPageSettings,
 } from '../../store/slices/landingPageSlice';
 import { fetchBranches } from '../../store/slices/branchesSlice';
@@ -103,7 +100,7 @@ const LandingPageEditor = () => {
     open: boolean;
     type: 'service' | 'offer' | 'doctor' | null;
   }>({ open: false, type: null });
-  const [selectedExistingItem, setSelectedExistingItem] = useState<any>(null);
+  const [ setSelectedExistingItem] = useState<any>(null);
 
   // Available branch names
   const availableBranches = branches.map(branch => branch.name);
@@ -174,14 +171,14 @@ const LandingPageEditor = () => {
       }
 
       // Add offer images
-      localContent.offers.forEach((offer, index) => {
+      localContent.offers.forEach((offer) => {
         if (offer.image instanceof File) {
           formData.append(`offerImages`, offer.image);
         }
       });
 
       // Add doctor images
-      localContent.doctors.forEach((doctor, index) => {
+      localContent.doctors.forEach((doctor) => {
         if (doctor.image instanceof File) {
           formData.append(`doctorImages`, doctor.image);
         }
@@ -246,7 +243,6 @@ const LandingPageEditor = () => {
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
       
       if (type === 'landing') {
         setLocalContent({

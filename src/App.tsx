@@ -1,7 +1,6 @@
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { useAppDispatch, useAppSelector } from "./hooks/redux";
-import { checkAuthStatus } from "./store/slices/authSlice";
+import {  useAppSelector } from "./hooks/redux";
 import Login from "./pages/Login";
 import LandingPageForm from "./pages/makingLandingPage/contentForm";
 import DataTable from "./pages/appoinments";
@@ -19,8 +18,7 @@ import LandingPageEditor from "./pages/makingLandingPage/landingPageSingle";
 
 function App() {
 
-  const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

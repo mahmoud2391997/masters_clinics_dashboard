@@ -1,0 +1,10 @@
+export declare const getRegions: () => Promise<any>;
+export declare const getRegion: (id: string | number) => Promise<any>;
+export declare const createRegion: (data: any) => Promise<any>;
+export declare const updateRegion: (id: string | number, data: any) => Promise<any>;
+export declare const deleteRegion: (id: string | number) => Promise<any>;
+export declare const getBranches: () => Promise<import("axios").AxiosResponse<any, any>>;
+export declare const getBranch: (id: string | number) => Promise<any>;
+export declare const createBranch: (data: any) => Promise<any>;
+export declare const updateBranch: (id: string | number, data: any) => Promise<any>;
+export declare const deleteBranch: (id: string | number) => Promise<any>;

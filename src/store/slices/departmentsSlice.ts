@@ -68,3 +68,4 @@ const departmentsSlice = createSlice({
 
 export const { clearError } = departmentsSlice.actions;
 export default departmentsSlice.reducer;
+export type { DepartmentsState };

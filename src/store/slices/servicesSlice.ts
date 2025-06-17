@@ -70,3 +70,4 @@ const servicesSlice = createSlice({
 
 export const { clearError } = servicesSlice.actions;
 export default servicesSlice.reducer;
+export type { ServicesState}

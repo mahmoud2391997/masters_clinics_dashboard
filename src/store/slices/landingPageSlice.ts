@@ -299,3 +299,4 @@ export const {
 } = landingPageSlice.actions;
 
 export default landingPageSlice.reducer;
+export type {LandingPageState}

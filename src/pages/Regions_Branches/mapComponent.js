@@ -1,0 +1,43 @@
+"use client";
+import { jsx as _jsx } from "react/jsx-runtime";
+import React, { useEffect, useRef } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+const DEFAULT_COORDINATES = { lat: 30.0444, lng: 31.2357 };
+const MapComponent = ({ coordinates }) => {
+    const mapRef = useRef(null);
+    const markerRef = useRef(null);
+    const mapContainerRef = useRef(null);
+    useEffect(() => {
+        const coords = coordinates || DEFAULT_COORDINATES;
+        if (mapContainerRef.current && !mapRef.current) {
+            mapRef.current = L.map(mapContainerRef.current).setView([coords.lat, coords.lng], 15);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(mapRef.current);
+            markerRef.current = L.marker([coords.lat, coords.lng]).addTo(mapRef.current);
+            markerRef.current.bindPopup(`Location: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`).openPopup();
+        }
+        return () => {
+            mapRef.current?.remove();
+            mapRef.current = null;
+            markerRef.current = null;
+        };
+    }, []);
+    // If coordinates prop changes
+    useEffect(() => {
+        const coords = coordinates || DEFAULT_COORDINATES;
+        if (mapRef.current) {
+            mapRef.current.setView([coords.lat, coords.lng], 15);
+            if (markerRef.current) {
+                markerRef.current.setLatLng([coords.lat, coords.lng]);
+            }
+            else {
+                markerRef.current = L.marker([coords.lat, coords.lng]).addTo(mapRef.current);
+            }
+            markerRef.current.bindPopup(`Location: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`).openPopup();
+        }
+    }, [coordinates]);
+    return (_jsx("div", { className: "relative w-full h-full", children: _jsx("div", { ref: mapContainerRef, className: "w-full h-full" }) }));
+};
+export default MapComponent;

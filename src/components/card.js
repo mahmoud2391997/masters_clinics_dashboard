@@ -1,0 +1,6 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCity } from "@fortawesome/free-solid-svg-icons";
+export default function CardStats({ regionName, branchCount }) {
+    return (_jsx("div", { className: "min-w-[210px]", children: _jsx("div", { className: "relative flex flex-col min-w-0 break-words bg-gray-200 rounded mb-6 xl:mb-0 shadow-lg text-[var(--main-gray)]", children: _jsxs("div", { className: "flex-auto p-4", children: [_jsx("div", { className: "flex justify-between items-center", children: _jsx("div", { className: "text-4xl p-3 mb-3 text-center inline-flex items-center justify-center min-w-16 z-40 rounded-xl relative", style: { background: "var(--mixedColor)" }, children: _jsx(FontAwesomeIcon, { icon: faCity, color: "white", className: "z-50" }) }) }), _jsx("div", { className: "relative w-full flex flex-col justify-between", children: _jsxs("div", { className: "w-full relative", children: [_jsx("p", { className: "text-blueGray-400 min-w-5 uppercase text-xl", children: regionName }), _jsxs("span", { className: "text-blueGray-400 min-w-5 uppercase text-xl", children: [branchCount, " \u0641\u0631\u0648\u0639"] })] }) })] }) }) }));
+}

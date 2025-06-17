@@ -83,3 +83,4 @@ const appointmentsSlice = createSlice({
 
 export const { clearError } = appointmentsSlice.actions;
 export default appointmentsSlice.reducer;
+export type { AppointmentsState };

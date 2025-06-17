@@ -1,13 +1,13 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk,type PayloadAction } from '@reduxjs/toolkit';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   role: string;
   name?: string;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
@@ -26,13 +26,14 @@ const initialState: AuthState = {
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+  async (
+    credentials: { email: string; password: string },
+    { rejectWithValue }
+  ) => {
     try {
       const response = await fetch('http://localhost:3000/auth/signin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       });
 
@@ -42,7 +43,6 @@ export const loginUser = createAsyncThunk(
         return rejectWithValue(data.message || 'فشل تسجيل الدخول');
       }
 
-      // Store token in sessionStorage
       sessionStorage.setItem('token', data.idToken);
       sessionStorage.setItem('role', data.role);
       if (data.user) {
@@ -54,7 +54,7 @@ export const loginUser = createAsyncThunk(
         token: data.idToken,
         role: data.role,
       };
-    } catch (error) {
+    } catch {
       return rejectWithValue('حدث خطأ غير متوقع');
     }
   }
@@ -71,14 +71,10 @@ export const checkAuthStatus = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = sessionStorage.getItem('token');
-      if (!token) {
-        return rejectWithValue('No token found');
-      }
+      if (!token) return rejectWithValue('No token found');
 
       const response = await fetch('http://localhost:3000/protected', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -90,7 +86,7 @@ export const checkAuthStatus = createAsyncThunk(
 
       const data = await response.json();
       return data.user;
-    } catch (error) {
+    } catch {
       return rejectWithValue('Auth check failed');
     }
   }
@@ -109,7 +105,6 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Login
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -128,14 +123,12 @@ const authSlice = createSlice({
         state.token = null;
         state.error = action.payload as string;
       })
-      // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
         state.error = null;
       })
-      // Check auth status
       .addCase(checkAuthStatus.fulfilled, (state, action) => {
         state.user = action.payload;
         state.isAuthenticated = true;

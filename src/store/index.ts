@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import { combineReducers } from '@reduxjs/toolkit';
+
 import authSlice from './slices/authSlice';
 import landingPageSlice from './slices/landingPageSlice';
 import branchesSlice from './slices/branchesSlice';

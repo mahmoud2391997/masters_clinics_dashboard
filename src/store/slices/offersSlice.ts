@@ -73,3 +73,4 @@ const offersSlice = createSlice({
 
 export const { clearError } = offersSlice.actions;
 export default offersSlice.reducer;
+export type { OffersState}
