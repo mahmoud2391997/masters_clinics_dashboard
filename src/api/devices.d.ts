@@ -12,14 +12,16 @@ interface WorkingTimeSlot {
 }
 type WeekDay = 'الأحد' | 'الاثنين' | 'الثلاثاء' | 'الأربعاء' | 'الخميس' | 'الجمعة' | 'السبت';
 interface Device {
-    id: string;
-    _id: string;
-    name: string;
-    department_id: number[];
-    branches: number[];
-    working_time_slots: WorkingTimeSlot[];
-    sessionPeriod: string;
-    imageUrl?: string;
+  id: string;
+  _id: string;
+  name: string;
+  description?: string;
+  department_id: number[];
+  branches: number[];
+  working_time_slots: WorkingTimeSlot[];
+  sessionPeriod: string;
+  imageUrl?: string;
+  image?: string;
 }
 export declare const getDevices: () => Promise<Device[]>;
 export declare const addDevice: (formData: FormData) => Promise<any>;

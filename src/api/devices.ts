@@ -26,7 +26,7 @@ type WeekDay =
 interface Device {
   id: string;
     _id: string;
-
+description?: string;
   name: string;
   department_id: number[];
   branches: number[];
