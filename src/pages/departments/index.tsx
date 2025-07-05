@@ -48,7 +48,7 @@ const [newDeptImageFile, setNewDeptImageFile] = useState<File | null>(null);
                 formData.append('image', newDeptImage);
             }
 
-            const res = await axios.post<DepartmentStat>("http://localhost:3000/departments", formData, {
+            const res = await axios.post<DepartmentStat>("https://www.ss.mastersclinics.com/departments", formData, {
                 headers: {
                     "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
                 }
@@ -73,7 +73,7 @@ const [newDeptImageFile, setNewDeptImageFile] = useState<File | null>(null);
     const fetchDepartments = async () => {
         setLoading(true);
         try {
-            const res = await axios.get<DepartmentStat[]>("http://localhost:3000/departments", {
+            const res = await axios.get<DepartmentStat[]>("https://www.ss.mastersclinics.com/departments", {
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${sessionStorage.getItem("token")}`,

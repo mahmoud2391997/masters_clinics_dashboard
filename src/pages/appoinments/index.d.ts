@@ -7,7 +7,7 @@ interface DataTableProps {
     userRole: 'customercare' | 'mediabuyer' | 'admin';
 }
 interface FormField {
-    name: string;
+    key: string;
     label?: string;
 }
 interface Appointment {
@@ -25,11 +25,12 @@ interface Appointment {
     [key: string]: any;
 }
 interface CallLog {
-    id: string;
+    id?: string;
     timestamp: string;
     status: string;
     notes?: string;
     agentName?: string;
+    editedBy?: string;
 }
-declare const DataTable: React.FC<DataTableProps>;
+declare const DataTable: React.FC<Partial<DataTableProps>>;
 export default DataTable;

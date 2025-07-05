@@ -125,7 +125,7 @@ export default function LeadForm({ setAddLead }: LeadFormProps) {
     };
 
     try {
-      const res = await fetch("http://localhost:3000/appointments", {
+      const res = await fetch("https://www.ss.mastersclinics.com/appointments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

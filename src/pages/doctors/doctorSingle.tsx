@@ -70,7 +70,7 @@ const formatTime = (time: string) => {
 };
 
 async function fetchDoctor(id: string, allBranches: Branch[]): Promise<Doctor> {
-  const response = await fetch(`http://localhost:3000/doctors/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/doctors/${id}`, {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -98,7 +98,7 @@ async function fetchDoctor(id: string, allBranches: Branch[]): Promise<Doctor> {
 }
 
 async function fetchDepartments(): Promise<Department[]> {
-  const response = await fetch('http://localhost:3000/departments', {
+  const response = await fetch('https://www.ss.mastersclinics.com/departments', {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -111,7 +111,7 @@ async function fetchDepartments(): Promise<Department[]> {
 }
 
 async function fetchBranches(): Promise<Branch[]> {
-  const response = await fetch('http://localhost:3000/branches', {
+  const response = await fetch('https://www.ss.mastersclinics.com/branches', {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -148,7 +148,7 @@ async function updateDoctor(id: string, data: Partial<Doctor>, branches: number[
     formData.append('image', data.image);
   }
   
-  const response = await fetch(`http://localhost:3000/doctors/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/doctors/${id}`, {
     method: 'PUT',
     headers: {
       'Authorization': token ? `Bearer ${token}` : '',

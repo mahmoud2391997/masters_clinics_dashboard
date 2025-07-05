@@ -52,7 +52,7 @@ export default function AddService() {
         setError(null);
 
         // Fetch doctors
-        const doctorsRes = await fetch("http://localhost:3000/doctors", {
+        const doctorsRes = await fetch("https://www.ss.mastersclinics.com/doctors", {
           headers: {
             Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
@@ -71,7 +71,7 @@ export default function AddService() {
         setAvailableBranches(branchObjects);
 
         // Fetch services
-        const servicesRes = await fetch("http://localhost:3000/services", {
+        const servicesRes = await fetch("https://www.ss.mastersclinics.com/services", {
           headers: {
             Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
@@ -154,7 +154,7 @@ export default function AddService() {
     formData.append("branches", JSON.stringify(selectedBranches));
 
     try {
-      const response = await fetch("http://localhost:3000/services", {
+      const response = await fetch("https://www.ss.mastersclinics.com/services", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,
@@ -189,7 +189,7 @@ export default function AddService() {
 
     try {
       const serviceId = editingService._id || String(editingService.id);
-      const response = await fetch(`http://localhost:3000/services/${serviceId}`, {
+      const response = await fetch(`https://www.ss.mastersclinics.com/services/${serviceId}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,
@@ -224,7 +224,7 @@ export default function AddService() {
     if (!window.confirm("هل أنت متأكد من رغبتك في حذف هذه الخدمة؟")) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/services/${id}`, {
+      const response = await fetch(`https://www.ss.mastersclinics.com/services/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,

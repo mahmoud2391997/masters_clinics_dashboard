@@ -19,7 +19,7 @@ type Branch = {
 };
 
 async function fetchBranch(id: string): Promise<Branch> {
-  const response = await fetch(`http://localhost:3000/branches/${id}`,
+  const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`,
     {
       headers:{
         'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ async function fetchBranch(id: string): Promise<Branch> {
 }
 
 async function updateBranch(id: string, data: Partial<Branch>): Promise<Branch> {
-  const response = await fetch(`http://localhost:3000/branches/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`, {
     method: 'PUT',
     headers: {
       "Authorization": `Bearer ${sessionStorage.getItem("token")}`,

@@ -1,15 +1,32 @@
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, TextField, MenuItem, TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Typography, IconButton, ListItemSecondaryAction } from '@mui/material';
-import { updateAppointments } from '../../api/landingPages';
+import { Box, TextField, MenuItem, TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Typography, IconButton, ListItemSecondaryAction, Chip, Tooltip, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import LeadForm from './appointmentForm';
-const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRole }) => {
-    const [addLead, setAddLead] = useState(false);
-    const [role] = useState(sessionStorage.getItem("role"));
+import { updateAppointments, deleteAppointment } from '../../api/landingPages';
+const statusColors = {
+    'لم يتم التواصل': 'warning',
+    'استفسار': 'info',
+    'مهتم': 'success',
+    'غير مهتم': 'error',
+    'تم الحجز': 'success',
+    'تم التواصل علي الواتس اب': 'success',
+    'لم يتم الرد': 'warning',
+    'طلب التواصل في وقت اخر': 'info',
+};
+const statusOptions = [
+    'لم يتم التواصل',
+    'استفسار',
+    'مهتم',
+    'غير مهتم',
+    'تم الحجز',
+    'تم التواصل علي الواتس اب',
+    'لم يتم الرد',
+    'طلب التواصل في وقت اخر',
+];
+const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRole = 'customercare' }) => {
     const [state, setState] = useState({
         search: '',
         branchFilter: 'all',
@@ -22,9 +39,14 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         newCallLogNotes: '',
         editingLogId: null,
         editedLogStatus: '',
-        editedLogNotes: ''
+        editedLogNotes: '',
+        deleteConfirmOpen: false,
+        appointmentToDelete: null,
     });
-    const { search, branchFilter, loading, error, fetchedData, selectedAppointment, callLogDialogOpen, newCallLogStatus, newCallLogNotes, editingLogId, editedLogStatus, editedLogNotes } = state;
+    const { search, branchFilter, loading, error, fetchedData, selectedAppointment, callLogDialogOpen, newCallLogStatus, newCallLogNotes, editingLogId, editedLogStatus, editedLogNotes, deleteConfirmOpen, appointmentToDelete, } = state;
+    // Use passed userRole or fallback to sessionStorage role
+    const role = userRole || (sessionStorage.getItem("role") ?? 'customercare');
+    const username = sessionStorage.getItem("username") || 'غير معروف';
     const fetchWithToken = async (url, options = {}) => {
         const token = sessionStorage.getItem('token');
         return fetch(url, {
@@ -40,46 +62,19 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         const fetchData = async () => {
             setState(prev => ({ ...prev, loading: true, error: null }));
             try {
-                const response = await fetchWithToken('http://localhost:3000/appointments', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        "Authorization": `Bearer ${sessionStorage.getItem('token') || ''}`
-                    }
-                });
+                const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
                 if (!response.ok)
                     throw new Error('Network error');
                 const data = await response.json();
+                console.log('Fetched appointments:', data);
                 setState(prev => ({ ...prev, fetchedData: data, loading: false }));
             }
             catch (err) {
-                console.log(err);
                 setState(prev => ({ ...prev, error: 'فشل في تحميل البيانات', loading: false }));
             }
         };
         fetchData();
     }, []);
-    const handleDelete = async (id) => {
-        if (window.confirm('هل أنت متأكد من حذف هذا الحجز؟')) {
-            try {
-                setState(prev => ({ ...prev, loading: true }));
-                const response = await fetchWithToken(`http://localhost:3000/appointments/${id}`, {
-                    method: 'DELETE'
-                });
-                if (!response.ok)
-                    throw new Error('Failed to delete appointment');
-                setState(prev => ({
-                    ...prev,
-                    fetchedData: prev.fetchedData?.filter(item => item._id !== id && item.id !== id),
-                    loading: false
-                }));
-            }
-            catch (err) {
-                console.error('Error deleting appointment:', err);
-                setState(prev => ({ ...prev, error: 'فشل في حذف الحجز', loading: false }));
-            }
-        }
-    };
     const branchOptions = useMemo(() => {
         const branches = (fetchedData || []).map(d => d.branch).filter(Boolean);
         return Array.from(new Set(branches));
@@ -88,12 +83,18 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         if (!obj)
             return false;
         return Object.values(obj).some(val => {
-            if (typeof val === 'object' && val !== null) {
+            if (typeof val === 'object' && val !== null)
                 return deepSearch(val, searchTerm);
-            }
             const stringValue = String(val ?? '').toLowerCase();
             return stringValue.includes(searchTerm.toLowerCase());
         });
+    };
+    const getLastCallStatus = (appointment) => {
+        if (!appointment.callLogs || appointment.callLogs.length === 0) {
+            return null;
+        }
+        const sortedLogs = [...appointment.callLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        return sortedLogs[0];
     };
     const filteredData = useMemo(() => {
         if (!fetchedData)
@@ -116,36 +117,36 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             callLogDialogOpen: true,
             newCallLogStatus: '',
             newCallLogNotes: '',
-            editingLogId: null
+            editingLogId: null,
+            editedLogStatus: '',
+            editedLogNotes: ''
         }));
     };
     const closeCallLogDialog = () => {
         setState(prev => ({
             ...prev,
             callLogDialogOpen: false,
-            selectedAppointment: null
+            selectedAppointment: null,
+            editingLogId: null
         }));
     };
     const addNewCallLog = async () => {
-        if (!selectedAppointment || !newCallLogStatus)
+        if (!selectedAppointment || !newCallLogStatus || !statusOptions.includes(newCallLogStatus))
             return;
         try {
             const newLog = {
-                id: Date.now().toString(),
                 timestamp: new Date().toISOString(),
                 status: newCallLogStatus,
                 notes: newCallLogNotes,
-                agentName: sessionStorage.getItem('username') || 'Unknown'
+                agentName: username || 'غير معروف'
             };
             const updatedLogs = [...(selectedAppointment.callLogs || []), newLog];
-            await updateAppointments(selectedAppointment._id || selectedAppointment.id, {
-                callLogs: updatedLogs
-            });
+            await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
+            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
-                fetchedData: prev.fetchedData?.map(item => item._id === selectedAppointment._id || item.id === selectedAppointment.id
-                    ? { ...item, callLogs: updatedLogs }
-                    : item),
+                fetchedData: data,
                 newCallLogStatus: '',
                 newCallLogNotes: ''
             }));
@@ -157,7 +158,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
     const startEditingLog = (log) => {
         setState(prev => ({
             ...prev,
-            editingLogId: log.id,
+            editingLogId: log.id ?? null, // استخدم null وليس undefined
             editedLogStatus: log.status,
             editedLogNotes: log.notes || ''
         }));
@@ -179,22 +180,23 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
                     ...log,
                     status: editedLogStatus,
                     notes: editedLogNotes,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    editedBy: username
                 }
                 : log);
-            await updateAppointments(selectedAppointment._id || selectedAppointment.id, {
-                callLogs: updatedLogs
-            });
+            await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
+            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
-                fetchedData: prev.fetchedData?.map(item => item._id === selectedAppointment._id || item.id === selectedAppointment.id
-                    ? { ...item, callLogs: updatedLogs }
-                    : item),
-                editingLogId: null
+                fetchedData: data,
+                editingLogId: null,
+                editedLogStatus: '',
+                editedLogNotes: ''
             }));
         }
         catch (err) {
-            console.error('Failed to update call log:', err);
+            console.error('Failed to save edited call log:', err);
         }
     };
     const deleteCallLog = async (logId) => {
@@ -202,65 +204,78 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             return;
         try {
             const updatedLogs = (selectedAppointment.callLogs || []).filter(log => log.id !== logId);
-            await updateAppointments(selectedAppointment._id || selectedAppointment.id, {
-                callLogs: updatedLogs
-            });
+            await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
+            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
-                fetchedData: prev.fetchedData?.map(item => item._id === selectedAppointment._id || item.id === selectedAppointment.id
-                    ? { ...item, callLogs: updatedLogs }
-                    : item)
+                fetchedData: data,
             }));
         }
         catch (err) {
             console.error('Failed to delete call log:', err);
         }
     };
-    const getLatestStatus = (callLogs = []) => {
-        if (callLogs.length === 0)
-            return 'لم يتم التواصل';
-        const sorted = [...callLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        return sorted[0].status;
+    const openDeleteConfirm = (appointmentId) => {
+        setState(prev => ({
+            ...prev,
+            deleteConfirmOpen: true,
+            appointmentToDelete: appointmentId
+        }));
     };
-    const renderCellValue = (row, field) => {
-        if (field.name === 'clientStatus') {
-            const latestStatus = getLatestStatus(row.callLogs);
-            if (userRole === 'customercare' || userRole === 'admin') {
-                return (_jsxs(Box, { display: "flex", alignItems: "center", children: [_jsx(Typography, { variant: "body2", sx: { mr: 1 }, children: latestStatus }), _jsx(IconButton, { size: "small", onClick: () => openCallLogDialog(row), color: "primary", children: _jsx(AddIcon, { fontSize: "small" }) })] }));
-            }
-            else if (userRole === 'mediabuyer') {
-                return latestStatus;
-            }
-        }
-        if (field.name === 'createdAt') {
-            return new Date(row.createdAt).toLocaleString('ar-EG');
-        }
-        if (field.name === 'doctorOffer') {
-            const doctor = row.doctor || '';
-            const offer = row.offer || '';
-            return doctor && offer ? `${doctor} - ${offer}` : doctor || offer || '-';
-        }
-        return row[field.name] ?? '-';
+    const closeDeleteConfirm = () => {
+        setState(prev => ({
+            ...prev,
+            deleteConfirmOpen: false,
+            appointmentToDelete: null
+        }));
     };
-    const renderActions = (row) => (_jsx(TableCell, { align: "center", children: (userRole === 'admin' || userRole === 'mediabuyer') && (_jsx(Button, { variant: "outlined", color: "error", onClick: () => handleDelete(row._id || row.id), children: "\u062D\u0630\u0641" })) }));
-    const displayedFields = formFields.filter(field => field.name !== 'isContacted');
-    return (_jsxs("div", { dir: "rtl", className: "p-4", children: [addLead && _jsx(LeadForm, { setAddLead: setAddLead }), _jsxs(Box, { display: "flex", gap: 2, mb: 2, children: [_jsx(TextField, { label: "\u0628\u062D\u062B \u0634\u0627\u0645\u0644", variant: "outlined", size: "small", value: search, onChange: handleChange('search'), fullWidth: true, placeholder: "\u0627\u0628\u062D\u062B \u0641\u064A \u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0644..." }), _jsxs(TextField, { label: "\u0627\u0644\u0641\u0631\u0639", select: true, size: "small", value: branchFilter, onChange: handleChange('branchFilter'), style: { minWidth: 150 }, children: [_jsx(MenuItem, { value: "all", children: "\u0627\u0644\u0643\u0644" }), branchOptions.map(branch => (_jsx(MenuItem, { value: branch, children: branch }, branch)))] }), _jsx(Button, { onClick: () => setAddLead(true), children: "\u0627\u0636\u0627\u0641\u0629 \u0637\u0644\u0628 \u062D\u062C\u0632" })] }), loading && _jsx(Box, { textAlign: "center", my: 2, children: "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644..." }), error && _jsx(Box, { textAlign: "center", color: "error.main", my: 2, children: error }), !loading && !error && (_jsx(TableContainer, { component: Paper, children: _jsxs(Table, { children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [displayedFields.map(field => (_jsx(TableCell, { style: { fontWeight: 'bold', textAlign: 'right' }, children: field.label || field.name }, field.name))), role === "admin" || role === "mediabuyer" ?
-                                        _jsx(TableCell, { align: "center", style: { fontWeight: 'bold' }, children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A" }) : null] }) }), _jsx(TableBody, { children: filteredData.length > 0 ? (filteredData.map(row => (_jsxs(TableRow, { hover: true, children: [displayedFields.map(field => (_jsx(TableCell, { style: { textAlign: 'right' }, children: renderCellValue(row, field) }, `${row.id}-${field.name}`))), renderActions(row)] }, row.id)))) : (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: displayedFields.length + 1, align: "center", children: search.trim()
-                                        ? 'لا توجد نتائج مطابقة للبحث'
-                                        : 'لا توجد بيانات متاحة' }) })) })] }) })), _jsxs(Dialog, { open: callLogDialogOpen, onClose: closeCallLogDialog, fullWidth: true, maxWidth: "md", children: [_jsx(DialogTitle, { children: _jsxs(Box, { display: "flex", justifyContent: "space-between", alignItems: "center", children: ["\u0633\u062C\u0644 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0627\u062A - ", selectedAppointment?.name, _jsx(IconButton, { onClick: closeCallLogDialog, children: _jsx(CloseIcon, {}) })] }) }), _jsxs(DialogContent, { children: [_jsxs(Box, { mb: 3, children: [_jsx(Typography, { variant: "h6", gutterBottom: true, children: "\u0625\u0636\u0627\u0641\u0629 \u0645\u0643\u0627\u0644\u0645\u0629 \u062C\u062F\u064A\u062F\u0629" }), _jsx(Box, { display: "flex", gap: 2, mb: 2, children: _jsxs(TextField, { select: true, label: "\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629", value: newCallLogStatus, onChange: (e) => setState(prev => ({ ...prev, newCallLogStatus: e.target.value })), fullWidth: true, size: "small", children: [_jsx(MenuItem, { value: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644", children: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644" }), _jsx(MenuItem, { value: "\u0627\u0633\u062A\u0641\u0633\u0627\u0631", children: "\u0627\u0633\u062A\u0641\u0633\u0627\u0631" }), _jsx(MenuItem, { value: "\u0645\u0647\u062A\u0645", children: "\u0645\u0647\u062A\u0645" }), _jsx(MenuItem, { value: "\u063A\u064A\u0631 \u0645\u0647\u062A\u0645", children: "\u063A\u064A\u0631 \u0645\u0647\u062A\u0645" }), _jsx(MenuItem, { value: "\u062A\u0645 \u0627\u0644\u062D\u062C\u0632", children: "\u062A\u0645 \u0627\u0644\u062D\u062C\u0632" }), _jsx(MenuItem, { value: "\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644", children: "\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0639\u0644\u064A \u0627\u0644\u0648\u0627\u062A\u0633 \u0627\u0628" }), _jsx(MenuItem, { value: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0631\u062F", children: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0631\u062F" }), _jsx(MenuItem, { value: "\u0637\u0644\u0628 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0641\u064A \u0648\u0642\u062A \u0627\u062E\u0631", children: "\u0637\u0644\u0628 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0641\u064A \u0648\u0642\u062A \u0627\u062E\u0631" })] }) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: newCallLogNotes, onChange: (e) => setState(prev => ({ ...prev, newCallLogNotes: e.target.value })), fullWidth: true, multiline: true, rows: 3, size: "small" }), _jsx(Box, { mt: 2, display: "flex", justifyContent: "flex-end", children: _jsx(Button, { variant: "contained", onClick: addNewCallLog, disabled: !newCallLogStatus, children: "\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629" }) })] }), _jsx(Typography, { variant: "h6", gutterBottom: true, children: "\u0633\u062C\u0644 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0627\u0644\u0633\u0627\u0628\u0642\u0629" }), selectedAppointment?.callLogs?.length ? (_jsx(List, { children: [...selectedAppointment.callLogs]
-                                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                                    .map((log) => (_jsx(ListItem, { divider: true, children: editingLogId === log.id ? (_jsxs(Box, { width: "100%", children: [_jsx(Box, { display: "flex", gap: 2, mb: 2, children: _jsxs(TextField, { select: true, label: "\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629", value: editedLogStatus, onChange: (e) => setState(prev => ({ ...prev, editedLogStatus: e.target.value })), fullWidth: true, size: "small", children: [_jsx(MenuItem, { value: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644", children: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644" }), _jsx(MenuItem, { value: "\u0627\u0633\u062A\u0641\u0633\u0627\u0631", children: "\u0627\u0633\u062A\u0641\u0633\u0627\u0631" }), _jsx(MenuItem, { value: "\u0645\u0647\u062A\u0645", children: "\u0645\u0647\u062A\u0645" }), _jsx(MenuItem, { value: "\u063A\u064A\u0631 \u0645\u0647\u062A\u0645", children: "\u063A\u064A\u0631 \u0645\u0647\u062A\u0645" }), _jsx(MenuItem, { value: "\u062A\u0645 \u0627\u0644\u062D\u062C\u0632", children: "\u062A\u0645 \u0627\u0644\u062D\u062C\u0632" }), _jsx(MenuItem, { value: "\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644", children: "\u062A\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0639\u0644\u064A \u0627\u0644\u0648\u0627\u062A\u0633 \u0627\u0628" }), _jsx(MenuItem, { value: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0631\u062F", children: "\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0631\u062F" }), _jsx(MenuItem, { value: "\u0637\u0644\u0628 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0641\u064A \u0648\u0642\u062A \u0627\u062E\u0631", children: "\u0637\u0644\u0628 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0641\u064A \u0648\u0642\u062A \u0627\u062E\u0631" })] }) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: editedLogNotes, onChange: (e) => setState(prev => ({ ...prev, editedLogNotes: e.target.value })), fullWidth: true, multiline: true, rows: 3, size: "small" }), _jsxs(Box, { mt: 2, display: "flex", justifyContent: "flex-end", gap: 1, children: [_jsx(Button, { variant: "outlined", onClick: cancelEditing, children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { variant: "contained", onClick: saveEditedLog, children: "\u062D\u0641\u0638" })] })] })) : (_jsxs(_Fragment, { children: [_jsx(ListItemText, { primary: _jsxs(Box, { display: "flex", justifyContent: "space-between", children: [_jsx(Typography, { children: new Date(log.timestamp).toLocaleString('ar-EG') }), _jsx(Typography, { fontWeight: "bold", children: log.status })] }), secondary: _jsxs(_Fragment, { children: [_jsx(Typography, { component: "span", display: "block", children: log.notes }), _jsxs(Typography, { component: "span", variant: "caption", color: "text.secondary", children: ["\u0627\u0644\u0645\u0633\u0624\u0648\u0644: ", log.agentName || 'غير معروف'] })] }) }), _jsxs(ListItemSecondaryAction, { children: [_jsx(IconButton, { edge: "end", onClick: () => startEditingLog(log), color: "primary", children: _jsx(EditIcon, {}) }), _jsx(IconButton, { edge: "end", onClick: () => deleteCallLog(log.id), color: "error", children: _jsx(DeleteIcon, {}) })] })] })) }, log.id))) })) : (_jsx(Typography, { variant: "body2", color: "text.secondary", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0645\u0633\u062C\u0644\u0629" }))] }), _jsx(DialogActions, { children: _jsx(Button, { onClick: closeCallLogDialog, children: "\u0625\u063A\u0644\u0627\u0642" }) })] })] }));
+    const confirmDeleteAppointment = async () => {
+        if (!appointmentToDelete)
+            return;
+        try {
+            await deleteAppointment(appointmentToDelete);
+            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const data = await refreshed.json();
+            setState(prev => ({
+                ...prev,
+                fetchedData: data,
+                deleteConfirmOpen: false,
+                appointmentToDelete: null
+            }));
+        }
+        catch (err) {
+            console.error('Failed to delete appointment:', err);
+            setState(prev => ({
+                ...prev,
+                error: 'فشل في حذف الموعد',
+                deleteConfirmOpen: false,
+                appointmentToDelete: null
+            }));
+        }
+    };
+    // Custom render for doctor_offer column
+    const renderDoctorOffer = (row) => {
+        return (_jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 }, children: [row.doctor && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", row.doctor] })), row.offer && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", row.offer] })), !row.doctor && !row.offer && '-'] }));
+    };
+    return (_jsxs(_Fragment, { children: [_jsxs(Box, { sx: { mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }, children: [_jsx(TextField, { label: "\u0628\u062D\u062B", value: search, onChange: handleChange('search'), sx: { minWidth: 200 } }), _jsxs(TextField, { select: true, label: "\u0641\u0631\u0639", value: branchFilter, onChange: handleChange('branchFilter'), sx: { minWidth: 150 }, children: [_jsx(MenuItem, { value: "all", children: "\u0627\u0644\u0643\u0644" }), branchOptions.map(branch => (_jsx(MenuItem, { value: branch, children: branch }, branch)))] })] }), _jsx(TableContainer, { component: Paper, sx: { maxHeight: 500 }, children: _jsxs(Table, { stickyHeader: true, size: "small", "aria-label": "appointments table", children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [formFields.map(field => (_jsx(TableCell, { align: "left", children: field.label }, field.key))), _jsx(TableCell, { children: "\u0622\u062E\u0631 \u062D\u0627\u0644\u0629" }), _jsx(TableCell, { children: "\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644" }), role === 'mediabuyer' && _jsx(TableCell, { children: "\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsxs(TableBody, { children: [loading && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", children: "... \u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644" }) })), error && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", sx: { color: 'red' }, children: error }) })), !loading && filteredData.length === 0 && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })), filteredData.map(row => {
+                                    const lastCall = getLastCallStatus(row);
+                                    return (_jsxs(TableRow, { hover: true, children: [formFields.map(field => (_jsx(TableCell, { children: field.key === 'createdAt'
+                                                    ? new Date(row[field.key]).toLocaleString('ar-EG')
+                                                    : field.key === 'doctor_offer'
+                                                        ? renderDoctorOffer(row)
+                                                        : (row[field.key] ?? '-') }, field.key))), _jsx(TableCell, { children: lastCall ? (_jsx(Tooltip, { title: `${new Date(lastCall.timestamp).toLocaleString('ar-EG')} - ${lastCall.agentName}`, children: _jsx(Chip, { label: lastCall.status, color: statusColors[lastCall.status] || 'default', size: "small", variant: "outlined" }) })) : (_jsx(Chip, { label: "\u0644\u0627 \u064A\u0648\u062C\u062F", color: "default", size: "small", variant: "outlined" })) }), _jsx(TableCell, { children: _jsxs(Button, { variant: "outlined", size: "small", onClick: () => openCallLogDialog(row), sx: { mr: 1 }, children: ["\u0639\u0631\u0636 (", (row.callLogs?.length) || 0, ")"] }) }), role === 'mediabuyer' && (_jsx(TableCell, { children: _jsx(Button, { variant: "outlined", color: "error", size: "small", onClick: () => openDeleteConfirm(row.id), startIcon: _jsx(DeleteIcon, { fontSize: "small" }), children: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0639\u062F" }) }))] }, row.id));
+                                })] })] }) }), _jsxs(Dialog, { open: callLogDialogOpen, onClose: closeCallLogDialog, maxWidth: "sm", fullWidth: true, children: [_jsxs(DialogTitle, { children: [_jsxs(Box, { children: [_jsxs(Typography, { variant: "h6", children: ["\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644: ", selectedAppointment?.name, " - ", selectedAppointment?.phone] }), _jsxs(Box, { sx: { mt: 1 }, children: [selectedAppointment?.doctor && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", selectedAppointment.doctor] })), selectedAppointment?.offer && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", selectedAppointment.offer] }))] })] }), _jsx(IconButton, { "aria-label": "close", onClick: closeCallLogDialog, sx: { position: 'absolute', left: 8, top: 8 }, children: _jsx(CloseIcon, {}) })] }), _jsxs(DialogContent, { dividers: true, children: [_jsx(List, { dense: true, children: (selectedAppointment?.callLogs || []).map(log => (_jsx(ListItem, { alignItems: "flex-start", divider: true, children: editingLogId === log.id ? (_jsxs(Box, { sx: { width: '100%' }, children: [_jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: editedLogStatus, onChange: e => setState(prev => ({ ...prev, editedLogStatus: e.target.value })), fullWidth: true, margin: "dense", size: "small", children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: editedLogNotes, onChange: e => setState(prev => ({ ...prev, editedLogNotes: e.target.value })), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsxs(Box, { sx: { mt: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }, children: [_jsx(Button, { onClick: cancelEditing, size: "small", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { variant: "contained", onClick: saveEditedLog, size: "small", children: "\u062D\u0641\u0638" })] })] })) : (_jsxs(_Fragment, { children: [_jsx(ListItemText, { primary: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: log.status, color: statusColors[log.status] || 'default', size: "small" }), log.editedBy && (_jsxs(Typography, { variant: "caption", color: "text.secondary", children: ["(\u062A\u0645 \u0627\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0648\u0627\u0633\u0637\u0629: ", log.editedBy, ")"] }))] }), secondary: _jsxs(_Fragment, { children: [_jsx(Typography, { component: "span", variant: "body2", color: "text.primary", children: log.notes || 'لا توجد ملاحظات' }), _jsx("br", {}), _jsxs(Typography, { component: "span", variant: "caption", color: "text.secondary", children: [new Date(log.timestamp).toLocaleString('ar-EG'), " - \u0627\u0644\u0648\u0643\u064A\u0644: ", log.agentName || 'غير معروف'] })] }) }), (role === 'customercare' || role === 'admin') && (_jsxs(ListItemSecondaryAction, { children: [_jsx(Tooltip, { title: "\u062A\u0639\u062F\u064A\u0644", children: _jsx(IconButton, { edge: "end", "aria-label": "edit", onClick: () => startEditingLog(log), size: "small", children: _jsx(EditIcon, { fontSize: "small" }) }) }), _jsx(Tooltip, { title: "\u062D\u0630\u0641", children: _jsx(IconButton, { edge: "end", "aria-label": "delete", onClick: () => log.id && deleteCallLog(log.id), size: "small", children: _jsx(DeleteIcon, { fontSize: "small" }) }) })] }))] })) }, log.id))) }), (role === 'customercare' || role === 'admin') && (_jsxs(Box, { sx: { mt: 2, borderTop: '1px solid #eee', pt: 2 }, children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644 \u062C\u062F\u064A\u062F" }), _jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: newCallLogStatus, onChange: handleChange('newCallLogStatus'), fullWidth: true, margin: "dense", size: "small", required: true, children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: newCallLogNotes, onChange: handleChange('newCallLogNotes'), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsx(Button, { variant: "contained", startIcon: _jsx(AddIcon, {}), sx: { mt: 1 }, onClick: addNewCallLog, disabled: !newCallLogStatus, size: "small", children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644" })] }))] }), _jsx(DialogActions, { children: _jsx(Button, { onClick: closeCallLogDialog, size: "small", children: "\u0625\u063A\u0644\u0627\u0642" }) })] }), _jsxs(Dialog, { open: deleteConfirmOpen, onClose: closeDeleteConfirm, children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Alert, { severity: "warning", children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0623\u0646\u0643 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0639\u062F\u061F \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u062A\u0631\u0627\u062C\u0639 \u0639\u0646\u0647." }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: closeDeleteConfirm, color: "primary", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: confirmDeleteAppointment, color: "error", variant: "contained", children: "\u062D\u0630\u0641" })] })] })] }));
 };
 const defaultFormFields = [
-    { name: 'name', label: 'الاسم' },
-    { name: 'phone', label: 'رقم الهاتف' },
-    { name: 'branch', label: 'الفرع' },
-    { name: 'doctorOffer', label: 'الطبيب/العرض' },
-    { name: 'createdAt', label: 'تاريخ طلب الحجز' },
-    { name: 'pageCreator', label: 'منشئ الصفحة' },
-    { name: 'pageTitle', label: 'عنوان الصفحة' },
-    { name: 'utmSource', label: 'المصدر' },
-    { name: 'clientStatus', label: 'حالة العميل' }
+    { key: "name", label: "الاسم" },
+    { key: "phone", label: "الهاتف" },
+    { key: "branch", label: "الفرع" },
+    { key: "doctor_offer", label: "الطبيب/العرض" },
+    { key: "pageCreator", label: "منشئ الصفحة" },
+    { key: "pageTitle", label: "عنوان الصفحة" },
+    { key: "utmSource", label: "المصدر" },
+    { key: "createdAt", label: "تاريخ الإنشاء" }
 ];
 const defaultData = [];
 export default DataTable;

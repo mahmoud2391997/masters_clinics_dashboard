@@ -9,7 +9,7 @@ const initialState = {
 // Async thunks
 export const loginUser = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
     try {
-        const response = await fetch('http://localhost:3000/auth/signin', {
+        const response = await fetch('https://www.ss.mastersclinics.com/auth/signin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(credentials),
@@ -18,7 +18,7 @@ export const loginUser = createAsyncThunk('auth/login', async (credentials, { re
         if (!response.ok) {
             return rejectWithValue(data.message || 'فشل تسجيل الدخول');
         }
-        sessionStorage.setItem('token', data.idToken);
+        sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('role', data.role);
         if (data.user) {
             sessionStorage.setItem('userData', JSON.stringify(data.user));
@@ -43,7 +43,7 @@ export const checkAuthStatus = createAsyncThunk('auth/checkStatus', async (_, { 
         const token = sessionStorage.getItem('token');
         if (!token)
             return rejectWithValue('No token found');
-        const response = await fetch('http://localhost:3000/protected', {
+        const response = await fetch('https://www.ss.mastersclinics.com/protected', {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) {

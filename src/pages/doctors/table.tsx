@@ -82,7 +82,7 @@ const DataTableHeaders: React.FC = () => {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await axios.get<Doctor[]>('http://localhost:3000/doctors',
+        const response = await axios.get<Doctor[]>('https://www.ss.mastersclinics.com/doctors',
           {
             headers: {
               'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ const DataTableHeaders: React.FC = () => {
         formData.append('imageUrl', imageUrl);
       }
 
-      const response = await axios.post('http://localhost:3000/doctors', formData, {
+      const response = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           "Authorization": `Bearer ${sessionStorage.getItem('token')}`,

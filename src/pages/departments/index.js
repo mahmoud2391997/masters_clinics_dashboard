@@ -33,7 +33,7 @@ const DepartmentsStatsGrid = () => {
             else if (newDeptImage) {
                 formData.append('image', newDeptImage);
             }
-            const res = await axios.post("http://localhost:3000/departments", formData, {
+            const res = await axios.post("https://www.ss.mastersclinics.com/departments", formData, {
                 headers: {
                     "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
                 }
@@ -58,7 +58,7 @@ const DepartmentsStatsGrid = () => {
     const fetchDepartments = async () => {
         setLoading(true);
         try {
-            const res = await axios.get("http://localhost:3000/departments", {
+            const res = await axios.get("https://www.ss.mastersclinics.com/departments", {
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${sessionStorage.getItem("token")}`,

@@ -37,7 +37,7 @@ const formatTime = (time) => {
     return `${hourNum > 12 ? hourNum - 12 : hourNum}:${minutes} ${hourNum >= 12 ? 'م' : 'ص'}`;
 };
 async function fetchDoctor(id, allBranches) {
-    const response = await fetch(`http://localhost:3000/doctors/${id}`, {
+    const response = await fetch(`https://www.ss.mastersclinics.com/doctors/${id}`, {
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -62,7 +62,7 @@ async function fetchDoctor(id, allBranches) {
     };
 }
 async function fetchDepartments() {
-    const response = await fetch('http://localhost:3000/departments', {
+    const response = await fetch('https://www.ss.mastersclinics.com/departments', {
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -73,7 +73,7 @@ async function fetchDepartments() {
     return response.json();
 }
 async function fetchBranches() {
-    const response = await fetch('http://localhost:3000/branches', {
+    const response = await fetch('https://www.ss.mastersclinics.com/branches', {
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -102,7 +102,7 @@ async function updateDoctor(id, data, branches, imageFile) {
     else if (data.image && typeof data.image === 'string') {
         formData.append('image', data.image);
     }
-    const response = await fetch(`http://localhost:3000/doctors/${id}`, {
+    const response = await fetch(`https://www.ss.mastersclinics.com/doctors/${id}`, {
         method: 'PUT',
         headers: {
             'Authorization': token ? `Bearer ${token}` : '',

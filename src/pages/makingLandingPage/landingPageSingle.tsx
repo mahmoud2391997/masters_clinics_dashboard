@@ -44,7 +44,6 @@ import {
   fetchExistingItems,
   updateCurrentLandingPageSettings,
 } from '../../store/slices/landingPageSlice';
-import { fetchBranches } from '../../store/slices/branchesSlice';
 import "./css.css";
 
 interface LandingPageContent {
@@ -77,6 +76,58 @@ interface LandingPageContent {
   }>;
 }
 
+interface BranchSelectorProps {
+  selectedBranches: string[];
+  onChange: (newValue: string[]) => void;
+}
+
+const BranchSelector = ({ selectedBranches, onChange }: BranchSelectorProps) => {
+  const branchOptions = [
+    "فرع العوالي",
+    "فرع الخالدية", 
+    "فرع الشاطئ",
+    "فرع البساتين",
+    "ابحر الشمالية",
+    "فرع الطائف"
+  ];
+
+  return (
+    <Autocomplete
+      multiple
+      options={branchOptions}
+      value={selectedBranches}
+      onChange={(_, newValue) => onChange(newValue || [])}
+      renderInput={(params) => (
+        <TextField {...params} label="الفروع" />
+      )}
+      renderTags={(value, getTagProps) =>
+        value.map((option, index) => (
+          <Chip
+            variant="outlined"
+            label={option}
+            {...getTagProps({ index })}
+            key={index}
+          />
+        ))
+      }
+    />
+  );
+};
+
+const getImageUrl = (image: string | File | undefined): string => {
+  if (!image) return "";
+  
+  if (image instanceof File) return "";
+
+  if (/^https?:\/\//.test(image)) return image;
+
+  if (image.startsWith("/public") || image.startsWith("/uploads")) {
+    return `https://www.ss.mastersclinics.com${image}`;
+  }
+
+  return `https://www.ss.mastersclinics.com/public/uploads/${image}`;
+};
+
 const LandingPageEditor = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -91,8 +142,6 @@ const LandingPageEditor = () => {
     existingItems,
   } = useAppSelector((state) => state.landingPages);
 
-  const { branches } = useAppSelector((state) => state.branches);
-
   const [isEditing, setIsEditing] = useState(false);
   const [localContent, setLocalContent] = useState<LandingPageContent | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -100,10 +149,7 @@ const LandingPageEditor = () => {
     open: boolean;
     type: 'service' | 'offer' | 'doctor' | null;
   }>({ open: false, type: null });
-  const [ setSelectedExistingItem] = useState<any>(null);
-
-  // Available branch names
-  const availableBranches = branches.map(branch => branch.name);
+  const [, setSelectedExistingItem] = useState<any>(null);
 
   // Clean up object URLs when unmounting
   useEffect(() => {
@@ -116,14 +162,11 @@ const LandingPageEditor = () => {
     if (id) {
       dispatch(fetchLandingPageById(id));
       dispatch(fetchExistingItems());
-      dispatch(fetchBranches());
     }
   }, [dispatch, id]);
 
   useEffect(() => {
     if (currentLandingPage) {
-      console.log(currentLandingPage.content);
-      
       setLocalContent(currentLandingPage.content);
     }
   }, [currentLandingPage]);
@@ -138,15 +181,11 @@ const LandingPageEditor = () => {
     if (!id || !currentLandingPage || !localContent) return;
 
     try {
-      // Create FormData to handle file uploads
       const formData = new FormData();
-      
-      // Add the JSON data
       const updatedPage = {
         ...currentLandingPage,
         content: {
           ...localContent,
-          // Convert File objects to strings for the JSON data
           landingScreen: {
             ...localContent.landingScreen,
             image: typeof localContent.landingScreen.image === 'string' 
@@ -165,26 +204,22 @@ const LandingPageEditor = () => {
       };
       formData.append('data', JSON.stringify(updatedPage));
 
-      // Add landing screen image if it's a File object
       if (localContent.landingScreen.image instanceof File) {
         formData.append('landingImage', localContent.landingScreen.image);
       }
 
-      // Add offer images
       localContent.offers.forEach((offer) => {
         if (offer.image instanceof File) {
           formData.append(`offerImages`, offer.image);
         }
       });
 
-      // Add doctor images
       localContent.doctors.forEach((doctor) => {
         if (doctor.image instanceof File) {
           formData.append(`doctorImages`, doctor.image);
         }
       });
 
-      // Dispatch the update with FormData
       await dispatch(updateLandingPage({ id, data: formData })).unwrap();
       setIsEditing(false);
       setImagePreview(null);
@@ -243,7 +278,6 @@ const LandingPageEditor = () => {
 
     const reader = new FileReader();
     reader.onload = () => {
-      
       if (type === 'landing') {
         setLocalContent({
           ...localContent,
@@ -630,7 +664,7 @@ const LandingPageEditor = () => {
                   
                   {(imagePreview || (typeof localContent.landingScreen.image === 'string' && localContent.landingScreen.image)) && (
                     <Avatar
-                      src={imagePreview || localContent.landingScreen.image as string}
+                      src={imagePreview || getImageUrl(localContent.landingScreen.image)}
                       variant="rounded"
                       sx={{ width: 200, height: 200, mx: 'auto', mb: 2 }}
                     />
@@ -671,7 +705,7 @@ const LandingPageEditor = () => {
                   {localContent.landingScreen.image && (
                     <Avatar
                       src={typeof localContent.landingScreen.image === 'string' 
-                        ? localContent.landingScreen.image 
+                        ? getImageUrl(localContent.landingScreen.image)
                         : URL.createObjectURL(localContent.landingScreen.image)}
                       variant="rounded"
                       sx={{ width: '100%', height: 200 }}
@@ -743,24 +777,9 @@ const LandingPageEditor = () => {
                         sx={{ mb: 2 }}
                       />
                       
-                      <Autocomplete
-                        multiple
-                        options={availableBranches}
-                        value={service.branches}
-                        onChange={(_, newValue) => updateItemField('service', index, 'branches', newValue)}
-                        renderInput={(params) => (
-                          <TextField {...params} label="الفروع" />
-                        )}
-                        renderTags={(value, getTagProps) =>
-                          value.map((option, index) => (
-                            <Chip
-                              variant="outlined"
-                              label={option}
-                              {...getTagProps({ index })}
-                              key={index}
-                            />
-                          ))
-                        }
+                      <BranchSelector 
+                        selectedBranches={service.branches}
+                        onChange={(newValue) => updateItemField('service', index, 'branches', newValue)}
                       />
                     </>
                   ) : (
@@ -837,7 +856,9 @@ const LandingPageEditor = () => {
                       <Box textAlign="center" mb={2}>
                         {offer.image && (
                           <Avatar
-                            src={typeof offer.image === 'string' ? offer.image : URL.createObjectURL(offer.image)}
+                            src={typeof offer.image === 'string' 
+                              ? getImageUrl(offer.image)
+                              : URL.createObjectURL(offer.image)}
                             variant="rounded"
                             sx={{ width: 120, height: 120, mx: 'auto', mb: 1 }}
                           />
@@ -887,31 +908,18 @@ const LandingPageEditor = () => {
                         sx={{ mb: 2 }}
                       />
 
-                      <Autocomplete
-                        multiple
-                        options={availableBranches}
-                        value={offer.branches}
-                        onChange={(_, newValue) => updateItemField('offer', index, 'branches', newValue)}
-                        renderInput={(params) => (
-                          <TextField {...params} label="الفروع" />
-                        )}
-                        renderTags={(value, getTagProps) =>
-                          value.map((option, tagIndex) => (
-                            <Chip
-                              variant="outlined"
-                              label={option}
-                              {...getTagProps({ index: tagIndex })}
-                              key={tagIndex}
-                            />
-                          ))
-                        }
+                      <BranchSelector 
+                        selectedBranches={offer.branches}
+                        onChange={(newValue) => updateItemField('offer', index, 'branches', newValue)}
                       />
                     </>
                   ) : (
                     <>
                       {offer.image && (
                         <Avatar
-                          src={typeof offer.image === 'string' ? offer.image : URL.createObjectURL(offer.image)}
+                          src={typeof offer.image === 'string' 
+                            ? getImageUrl(offer.image)
+                            : URL.createObjectURL(offer.image)}
                           variant="rounded"
                           sx={{ width: '100%', height: 150, mb: 2 }}
                         />
@@ -992,7 +1000,9 @@ const LandingPageEditor = () => {
                       <Box mb={2}>
                         {doctor.image && (
                           <Avatar
-                            src={typeof doctor.image === 'string' ? doctor.image : URL.createObjectURL(doctor.image)}
+                            src={typeof doctor.image === 'string' 
+                              ? getImageUrl(doctor.image)
+                              : URL.createObjectURL(doctor.image)}
                             sx={{ width: 100, height: 100, mx: 'auto', mb: 1 }}
                           />
                         )}
@@ -1031,31 +1041,18 @@ const LandingPageEditor = () => {
                         sx={{ mb: 2 }}
                       />
 
-                      <Autocomplete
-                        multiple
-                        options={availableBranches}
-                        value={doctor.branches}
-                        onChange={(_, newValue) => updateItemField('doctor', index, 'branches', newValue)}
-                        renderInput={(params) => (
-                          <TextField {...params} label="الفروع" />
-                        )}
-                        renderTags={(value, getTagProps) =>
-                          value.map((option, tagIndex) => (
-                            <Chip
-                              variant="outlined"
-                              label={option}
-                              {...getTagProps({ index: tagIndex })}
-                              key={tagIndex}
-                            />
-                          ))
-                        }
+                      <BranchSelector 
+                        selectedBranches={doctor.branches}
+                        onChange={(newValue) => updateItemField('doctor', index, 'branches', newValue)}
                       />
                     </>
                   ) : (
                     <>
                       {doctor.image && (
                         <Avatar
-                          src={typeof doctor.image === 'string' ? doctor.image : URL.createObjectURL(doctor.image)}
+                          src={typeof doctor.image === 'string' 
+                            ? getImageUrl(doctor.image)
+                            : URL.createObjectURL(doctor.image)}
                           sx={{ width: 100, height: 100, mx: 'auto', mb: 2 }}
                         />
                       )}

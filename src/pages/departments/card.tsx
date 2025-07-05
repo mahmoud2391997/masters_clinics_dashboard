@@ -4,7 +4,7 @@ import { faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 
 export const updateDepartment = async (_id: string, department: FormData) => {
-    const response = await axios.put(`http://localhost:3000/departments/${_id}`, department, {
+    const response = await axios.put(`https://www.ss.mastersclinics.com/departments/${_id}`, department, {
         headers: {
             "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
         }
@@ -13,7 +13,7 @@ export const updateDepartment = async (_id: string, department: FormData) => {
 };
 
 export const deleteDepartment = async (_id: string) => {
-    const response = await axios.delete(`http://localhost:3000/departments/${_id}`, {
+    const response = await axios.delete(`https://www.ss.mastersclinics.com/departments/${_id}`, {
         headers: {
             "Authorization": `Bearer ${sessionStorage.getItem("token")}`
         }

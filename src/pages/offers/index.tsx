@@ -553,14 +553,14 @@ const OfferAddForm = () => {
     const fetchInitialData = async () => {
       try {
         // Fetch services
-        const servicesRes = await fetch('http://localhost:3000/services', {
+        const servicesRes = await fetch('https://www.ss.mastersclinics.com/services', {
           headers: getAuthHeaders()
         });
         const servicesData = await servicesRes.json();
         setServices(servicesData);
 
         // Fetch all doctors
-        const doctorsRes = await fetch('http://localhost:3000/doctors', {
+        const doctorsRes = await fetch('https://www.ss.mastersclinics.com/doctors', {
           headers: getAuthHeaders()
         });
         const doctorsData = await doctorsRes.json();
@@ -591,7 +591,7 @@ const OfferAddForm = () => {
 
   const fetchOffers = async () => {
     try {
-      const response = await fetch('http://localhost:3000/offers', {
+      const response = await fetch('https://www.ss.mastersclinics.com/offers', {
         headers: getAuthHeaders()
       });
       const data = await response.json();
@@ -738,7 +738,7 @@ const OfferAddForm = () => {
         formPayload.append('imageUrl', formData.imageUrl);
       }
 
-      const response = await fetch('http://localhost:3000/offers', {
+      const response = await fetch('https://www.ss.mastersclinics.com/offers', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -807,7 +807,7 @@ const OfferAddForm = () => {
     if (!offerToDelete) return;
     
     try {
-      const response = await fetch(`http://localhost:3000/offers/${offerToDelete}`, {
+      const response = await fetch(`https://www.ss.mastersclinics.com/offers/${offerToDelete}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -836,7 +836,7 @@ const OfferAddForm = () => {
 
   const handleSaveOffer = async (updatedOffer: Offer) => {
     try {
-      const response = await fetch(`http://localhost:3000/offers/${updatedOffer.id}`, {
+      const response = await fetch(`https://www.ss.mastersclinics.com/offers/${updatedOffer.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

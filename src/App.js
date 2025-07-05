@@ -29,7 +29,7 @@ function App() {
                 return;
             }
             try {
-                const res = await fetch('http://localhost:3000/protected', {
+                const res = await fetch('https://www.ss.mastersclinics.com/protected', {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },

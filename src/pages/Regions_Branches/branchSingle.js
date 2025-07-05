@@ -5,7 +5,7 @@ import { Button, TextField, Typography, Box, CircularProgress, Paper, IconButton
 import { Edit, Save, Cancel, ArrowBack, Add, Delete } from '@mui/icons-material';
 import MapComponent from './mapComponent';
 async function fetchBranch(id) {
-    const response = await fetch(`http://localhost:3000/branches/${id}`, {
+    const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`, {
         headers: {
             'Content-Type': 'application/json',
             "Authorization": `Bearer ${sessionStorage.getItem("token")}`
@@ -16,7 +16,7 @@ async function fetchBranch(id) {
     return response.json();
 }
 async function updateBranch(id, data) {
-    const response = await fetch(`http://localhost:3000/branches/${id}`, {
+    const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`, {
         method: 'PUT',
         headers: {
             "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
