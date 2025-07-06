@@ -20,7 +20,7 @@ interface Category {
     branches?: string[];
 }
 
-const API_BASE_URL = 'https://www.ss.mastersclinics.com';
+const API_BASE_URL = 'http://localhost:3000';
 
 const fetchCategoryById = async (id: string | number): Promise<Category> => {
     const response = await fetch(`${API_BASE_URL}/services/${id}`, {

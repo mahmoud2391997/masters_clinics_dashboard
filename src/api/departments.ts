@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://www.ss.mastersclinics.com/departments';
+const API_BASE_URL = 'http://localhost:3000/departments';
 
 export interface Department {
     _id: string; // MongoDB ObjectId as a string

@@ -62,7 +62,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         const fetchData = async () => {
             setState(prev => ({ ...prev, loading: true, error: null }));
             try {
-                const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+                const response = await fetchWithToken('http://localhost:3000/appointments');
                 if (!response.ok)
                     throw new Error('Network error');
                 const data = await response.json();
@@ -142,7 +142,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             };
             const updatedLogs = [...(selectedAppointment.callLogs || []), newLog];
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const refreshed = await fetchWithToken('http://localhost:3000/appointments');
             const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
@@ -185,7 +185,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
                 }
                 : log);
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const refreshed = await fetchWithToken('http://localhost:3000/appointments');
             const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
@@ -205,7 +205,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         try {
             const updatedLogs = (selectedAppointment.callLogs || []).filter(log => log.id !== logId);
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const refreshed = await fetchWithToken('http://localhost:3000/appointments');
             const data = await refreshed.json();
             setState(prev => ({
                 ...prev,
@@ -235,7 +235,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             return;
         try {
             await deleteAppointment(appointmentToDelete);
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+            const refreshed = await fetchWithToken('http://localhost:3000/appointments');
             const data = await refreshed.json();
             setState(prev => ({
                 ...prev,

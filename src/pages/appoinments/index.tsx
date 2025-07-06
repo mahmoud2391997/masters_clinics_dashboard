@@ -138,7 +138,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     const fetchData = async () => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+        const response = await fetchWithToken('http://localhost:3000/appointments');
         if (!response.ok) throw new Error('Network error');
         const data = await response.json();
         console.log('Fetched appointments:', data);
@@ -227,7 +227,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
 
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+      const refreshed = await fetchWithToken('http://localhost:3000/appointments');
       const data = await refreshed.json();
 
       setState(prev => ({
@@ -278,7 +278,7 @@ const startEditingLog = (log: CallLog) => {
 
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+      const refreshed = await fetchWithToken('http://localhost:3000/appointments');
       const data = await refreshed.json();
 
       setState(prev => ({
@@ -300,7 +300,7 @@ const startEditingLog = (log: CallLog) => {
       const updatedLogs = (selectedAppointment.callLogs || []).filter(log => log.id !== logId);
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+      const refreshed = await fetchWithToken('http://localhost:3000/appointments');
       const data = await refreshed.json();
 
       setState(prev => ({
@@ -333,7 +333,7 @@ const startEditingLog = (log: CallLog) => {
 
     try {
       await deleteAppointment(appointmentToDelete);
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+      const refreshed = await fetchWithToken('http://localhost:3000/appointments');
      
       const data = await refreshed.json();
       setState(prev => ({

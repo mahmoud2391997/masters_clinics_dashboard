@@ -106,7 +106,7 @@ interface LandingPageFormData {
   }
   content: Content
 }
-const API_URL = 'https://www.ss.mastersclinics.com/landingPage';
+const API_URL = 'http://localhost:3000/landingPage';
 
 export const createLandingPage = async (data: any) => {
     const response = await axios.post(API_URL, data);
@@ -302,7 +302,7 @@ const [landingImageSource, setLandingImageSource] = useState<"file" | "url" | nu
     const fetchExistingData = async () => {
       try {
         // Fetch existing doctors
-        const doctorsRes = await axios.get('https://www.ss.mastersclinics.com/doctors',        {
+        const doctorsRes = await axios.get('http://localhost:3000/doctors',        {
             headers:{
                 "Authorization": `Bearer ${sessionStorage.getItem("token")}`
             }
@@ -310,7 +310,7 @@ const [landingImageSource, setLandingImageSource] = useState<"file" | "url" | nu
         setExistingDoctors(doctorsRes.data);
 
         // Fetch existing services
-        const servicesRes = await axios.get('https://www.ss.mastersclinics.com/services',
+        const servicesRes = await axios.get('http://localhost:3000/services',
         {
             headers:{
                 "Authorization": `Bearer ${sessionStorage.getItem("token")}`
@@ -319,7 +319,7 @@ const [landingImageSource, setLandingImageSource] = useState<"file" | "url" | nu
         setExistingServices(servicesRes.data);
 
         // Fetch existing offers
-        const offersRes = await axios.get('https://www.ss.mastersclinics.com/offers',
+        const offersRes = await axios.get('http://localhost:3000/offers',
         {
             headers:{
                 "Authorization": `Bearer ${sessionStorage.getItem("token")}`

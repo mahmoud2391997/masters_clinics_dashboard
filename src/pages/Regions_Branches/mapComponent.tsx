@@ -4,10 +4,12 @@ import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-type MapProps = {
-  coordinates: { lat: number; lng: number } | null;
-};
+// ...other imports
 
+interface MapProps {
+  coordinates: { lat: number; lng: number } | null;
+  onLocationChange?: (lat: string, lng: string) => void;
+}
 const DEFAULT_COORDINATES = { lat: 30.0444, lng: 31.2357 };
 
 const MapComponent: React.FC<MapProps> = ({ coordinates }) => {

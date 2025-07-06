@@ -38,7 +38,7 @@ export const fetchAppointments = createAsyncThunk(
   'appointments/fetchAll',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('https://www.ss.mastersclinics.com/appointments', {
+      const response = await fetch('http://localhost:3000/appointments', {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sessionStorage.getItem('token')}`,

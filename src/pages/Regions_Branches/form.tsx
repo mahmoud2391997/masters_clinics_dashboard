@@ -149,7 +149,7 @@ const [formData, setFormData] = useState({
         payload.append('image', formData.image);
       }
       // Step 3: Submit to backend
-      await axios.post('https://www.ss.mastersclinics.com/branches', payload, {
+      await axios.post('http://localhost:3000/branches', payload, {
         headers: { 'Content-Type': 'multipart/form-data',
           "Authorization":`Bearer ${sessionStorage.getItem("token")}`
          },

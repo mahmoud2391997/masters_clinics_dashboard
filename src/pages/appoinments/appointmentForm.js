@@ -83,7 +83,7 @@ export default function LeadForm({ setAddLead }) {
             id: Math.random().toString(36).substr(2, 9),
         };
         try {
-            const res = await fetch("https://www.ss.mastersclinics.com/appointments", {
+            const res = await fetch("http://localhost:3000/appointments", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

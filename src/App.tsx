@@ -34,7 +34,7 @@ const navigate = useNavigate();
       }
 
       try {
-        const res = await fetch('https://www.ss.mastersclinics.com/protected', {
+        const res = await fetch('http://localhost:3000/protected', {
           headers: {
             Authorization: `Bearer ${token}`,
           },

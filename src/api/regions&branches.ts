@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = 'https://www.ss.mastersclinics.com'; // Adjust base URL as needed
+const API_BASE = 'http://localhost:3000'; // Adjust base URL as needed
 
 const getAuthHeaders = () => {
     const token = sessionStorage.getItem('token');

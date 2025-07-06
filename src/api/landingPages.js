@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_URL = 'https://www.ss.mastersclinics.com/appointments';
+const API_URL = 'http://localhost:3000/appointments';
 // Get all landing pages
 export const getLandingPages = async () => {
     const response = await axios.get(API_URL);
@@ -7,7 +7,7 @@ export const getLandingPages = async () => {
 };
 // Get a single landing page by ID
 export const getLandingPageById = async (id) => {
-    const response = await axios.get(`https://www.ss.mastersclinics.com/landingPage/${id}`);
+    const response = await axios.get(`http://localhost:3000/landingPage/${id}`);
     console.log(response.data);
     return response.data;
 };

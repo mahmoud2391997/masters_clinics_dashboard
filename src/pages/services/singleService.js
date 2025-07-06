@@ -4,7 +4,7 @@ import { Box, Typography, TextField, Button, Paper, Avatar, Divider, CircularPro
 import { Edit, Save, Cancel, Delete } from '@mui/icons-material';
 import { useParams } from 'react-router-dom';
 import SubservicesPage from './subServices';
-const API_BASE_URL = 'https://www.ss.mastersclinics.com';
+const API_BASE_URL = 'http://localhost:3000';
 const fetchCategoryById = async (id) => {
     const response = await fetch(`${API_BASE_URL}/services/${id}`, {
         headers: {

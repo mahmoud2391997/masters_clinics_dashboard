@@ -6,7 +6,7 @@ const initialState = {
 };
 export const fetchDepartments = createAsyncThunk('departments/fetchAll', async (_, { rejectWithValue }) => {
     try {
-        const response = await fetch('https://www.ss.mastersclinics.com/departments', {
+        const response = await fetch('http://localhost:3000/departments', {
             headers: {
                 Authorization: `Bearer ${sessionStorage.getItem('token')}`,
             },

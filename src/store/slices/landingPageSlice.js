@@ -13,7 +13,7 @@ const initialState = {
 // Async thunks
 export const fetchLandingPages = createAsyncThunk('landingPages/fetchAll', async (_, { rejectWithValue }) => {
     try {
-        const response = await fetch('https://www.ss.mastersclinics.com/landingPages', {
+        const response = await fetch('http://localhost:3000/landingPages', {
             headers: {
                 Authorization: `Bearer ${sessionStorage.getItem('token')}`,
             },
@@ -29,7 +29,7 @@ export const fetchLandingPages = createAsyncThunk('landingPages/fetchAll', async
 });
 export const fetchLandingPageById = createAsyncThunk('landingPages/fetchById', async (id, { rejectWithValue }) => {
     try {
-        const response = await fetch(`https://www.ss.mastersclinics.com/landingPage/${id}`, {
+        const response = await fetch(`http://localhost:3000/landingPage/${id}`, {
             headers: {
                 Authorization: `Bearer ${sessionStorage.getItem('token')}`,
             },
@@ -46,7 +46,7 @@ export const fetchLandingPageById = createAsyncThunk('landingPages/fetchById', a
 export const updateLandingPage = createAsyncThunk('landingPages/update', async ({ id, data }, { rejectWithValue }) => {
     console.log(data);
     try {
-        const response = await fetch(`https://www.ss.mastersclinics.com/landingPage/${id}`, {
+        const response = await fetch(`http://localhost:3000/landingPage/${id}`, {
             method: 'PUT',
             headers: {
                 Authorization: `Bearer ${sessionStorage.getItem('token')}`,
@@ -67,7 +67,7 @@ export const updateLandingPage = createAsyncThunk('landingPages/update', async (
 });
 export const deleteLandingPage = createAsyncThunk('landingPages/delete', async (id, { rejectWithValue }) => {
     try {
-        const response = await fetch(`https://www.ss.mastersclinics.com/landingPage/${id}`, {
+        const response = await fetch(`http://localhost:3000/landingPage/${id}`, {
             method: 'DELETE',
             headers: {
                 Authorization: `Bearer ${sessionStorage.getItem('token')}`,
@@ -85,13 +85,13 @@ export const deleteLandingPage = createAsyncThunk('landingPages/delete', async (
 export const fetchExistingItems = createAsyncThunk('landingPages/fetchExistingItems', async (_, { rejectWithValue }) => {
     try {
         const [doctorsRes, servicesRes, offersRes] = await Promise.all([
-            fetch('https://www.ss.mastersclinics.com/doctors', {
+            fetch('http://localhost:3000/doctors', {
                 headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
             }),
-            fetch('https://www.ss.mastersclinics.com/services', {
+            fetch('http://localhost:3000/services', {
                 headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
             }),
-            fetch('https://www.ss.mastersclinics.com/offers', {
+            fetch('http://localhost:3000/offers', {
                 headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
             }),
         ]);

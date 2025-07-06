@@ -165,7 +165,7 @@ const SubserviceAddForm = ({ id }: SubserviceAddFormProps) => {
         formPayload.append('imageUrl', formData.imageUrl);
       }
 
-      const response = await fetch('https://www.ss.mastersclinics.com/subServices', {
+      const response = await fetch('http://localhost:3000/subServices', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

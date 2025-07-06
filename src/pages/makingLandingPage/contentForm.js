@@ -6,7 +6,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import DataTable from "./table";
 import axios from "axios";
 import BranchSelector from "./brancheSelector";
-const API_URL = 'https://www.ss.mastersclinics.com/landingPage';
+const API_URL = 'http://localhost:3000/landingPage';
 export const createLandingPage = async (data) => {
     const response = await axios.post(API_URL, data);
     return response.data;
@@ -167,21 +167,21 @@ const LandingPageForm = () => {
         const fetchExistingData = async () => {
             try {
                 // Fetch existing doctors
-                const doctorsRes = await axios.get('https://www.ss.mastersclinics.com/doctors', {
+                const doctorsRes = await axios.get('http://localhost:3000/doctors', {
                     headers: {
                         "Authorization": `Bearer ${sessionStorage.getItem("token")}`
                     }
                 });
                 setExistingDoctors(doctorsRes.data);
                 // Fetch existing services
-                const servicesRes = await axios.get('https://www.ss.mastersclinics.com/services', {
+                const servicesRes = await axios.get('http://localhost:3000/services', {
                     headers: {
                         "Authorization": `Bearer ${sessionStorage.getItem("token")}`
                     }
                 });
                 setExistingServices(servicesRes.data);
                 // Fetch existing offers
-                const offersRes = await axios.get('https://www.ss.mastersclinics.com/offers', {
+                const offersRes = await axios.get('http://localhost:3000/offers', {
                     headers: {
                         "Authorization": `Bearer ${sessionStorage.getItem("token")}`
                     }

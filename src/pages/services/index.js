@@ -31,7 +31,7 @@ export default function AddService() {
                 setIsLoading({ doctors: true, branches: true, services: true });
                 setError(null);
                 // Fetch doctors
-                const doctorsRes = await fetch("https://www.ss.mastersclinics.com/doctors", {
+                const doctorsRes = await fetch("http://localhost:3000/doctors", {
                     headers: {
                         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                     },
@@ -47,7 +47,7 @@ export default function AddService() {
                 }));
                 setAvailableBranches(branchObjects);
                 // Fetch services
-                const servicesRes = await fetch("https://www.ss.mastersclinics.com/services", {
+                const servicesRes = await fetch("http://localhost:3000/services", {
                     headers: {
                         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                     },
@@ -123,7 +123,7 @@ export default function AddService() {
         formData.append("doctors_ids", JSON.stringify(selectedDoctors));
         formData.append("branches", JSON.stringify(selectedBranches));
         try {
-            const response = await fetch("https://www.ss.mastersclinics.com/services", {
+            const response = await fetch("http://localhost:3000/services", {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${sessionStorage.getItem("token")}`,
@@ -156,7 +156,7 @@ export default function AddService() {
         formData.append("branches", JSON.stringify(selectedBranches));
         try {
             const serviceId = editingService._id || String(editingService.id);
-            const response = await fetch(`https://www.ss.mastersclinics.com/services/${serviceId}`, {
+            const response = await fetch(`http://localhost:3000/services/${serviceId}`, {
                 method: "PUT",
                 headers: {
                     Authorization: `Bearer ${sessionStorage.getItem("token")}`,
@@ -184,7 +184,7 @@ export default function AddService() {
         if (!window.confirm("هل أنت متأكد من رغبتك في حذف هذه الخدمة؟"))
             return;
         try {
-            const response = await fetch(`https://www.ss.mastersclinics.com/services/${id}`, {
+            const response = await fetch(`http://localhost:3000/services/${id}`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${sessionStorage.getItem("token")}`,
