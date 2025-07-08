@@ -25,6 +25,7 @@ const SubservicesPage = () => {
                     headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
                 });
                 const data = await response.json();
+                console.log(data);
                 setSubservices(data);
             }
             catch (error) {
@@ -44,11 +45,11 @@ const SubservicesPage = () => {
         if (!selectedSubservice)
             return;
         try {
-            await fetch(`http://localhost:3000/subServices/${selectedSubservice._id}`, {
+            await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
-            setSubservices(subservices.filter(s => s._id !== selectedSubservice._id));
+            setSubservices(subservices.filter(s => s.id !== selectedSubservice.id));
         }
         catch (error) {
             console.error('حدث خطأ أثناء الحذف:', error);
@@ -96,7 +97,7 @@ const SubservicesPage = () => {
             if (imageFile) {
                 formDataToSend.append('image', imageFile);
             }
-            const response = await fetch(`http://localhost:3000/subservices/${selectedSubservice._id}`, {
+            const response = await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -104,7 +105,7 @@ const SubservicesPage = () => {
                 body: formDataToSend,
             });
             const updated = await response.json();
-            setSubservices(subservices.map(s => s._id === updated._id ? updated : s));
+            setSubservices(subservices.map(s => s.id === updated.id ? updated : s));
             setEditMode(false);
             setImageFile(null);
             setImagePreview(null);
@@ -120,7 +121,7 @@ const SubservicesPage = () => {
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                     gap: 3,
-                }, children: subservices.map((subservice) => (_jsxs(Card, { sx: { height: '100%', display: 'flex', flexDirection: 'column' }, children: [_jsx(CardMedia, { component: "img", height: "200", image: subservice.imageUrl || '/placeholder-image.jpg', alt: subservice.name }), _jsxs(CardContent, { sx: { flexGrow: 1 }, children: [_jsx(Typography, { gutterBottom: true, variant: "h5", children: subservice.name }), _jsx(Typography, { variant: "body2", color: "text.secondary", paragraph: true, children: subservice.description }), subservice.price && _jsx(Chip, { label: `$${subservice.price}`, color: "primary", sx: { mr: 1 } }), subservice.duration && _jsx(Chip, { label: `${subservice.duration} دقيقة`, sx: { mr: 1 } }), subservice.category && _jsx(Chip, { label: subservice.category, variant: "outlined" })] }), _jsxs(Box, { sx: { p: 2, display: 'flex', justifyContent: 'space-between' }, children: [_jsx(Button, { startIcon: _jsx(Edit, {}), onClick: () => handleEditClick(subservice), variant: "outlined", color: "primary", children: "\u062A\u0639\u062F\u064A\u0644" }), _jsx(Button, { startIcon: _jsx(Delete, {}), onClick: () => handleDeleteClick(subservice), variant: "outlined", color: "error", children: "\u062D\u0630\u0641" })] })] }, subservice._id))) }), _jsxs(Dialog, { open: editMode, onClose: () => setEditMode(false), maxWidth: "sm", fullWidth: true, children: [_jsx(DialogTitle, { children: "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062E\u062F\u0645\u0629 \u0627\u0644\u0641\u0631\u0639\u064A\u0629" }), _jsx(DialogContent, { children: _jsxs(Stack, { spacing: 3, sx: { mt: 2 }, children: [imagePreview && (_jsx(Box, { sx: { display: 'flex', justifyContent: 'center' }, children: _jsx("img", { src: imagePreview, alt: "Preview", style: { maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' } }) })), _jsxs(Button, { variant: "contained", component: "label", fullWidth: true, children: [imageFile ? 'تغيير الصورة' : 'اختر صورة', _jsx("input", { type: "file", hidden: true, accept: "image/*", onChange: handleImageChange })] }), _jsx(TextField, { label: "\u0627\u0644\u0627\u0633\u0645", name: "name", value: formData.name || '', onChange: handleFormChange, fullWidth: true, required: true }), _jsx(TextField, { label: "\u0627\u0644\u0648\u0635\u0641", name: "description", value: formData.description || '', onChange: handleFormChange, fullWidth: true, multiline: true, rows: 4 }), _jsxs(Box, { display: "flex", gap: 2, children: [_jsx(TextField, { label: "\u0627\u0644\u0633\u0639\u0631", name: "price", type: "number", value: formData.price || '', onChange: handleFormChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u062F\u0629 (\u062F\u0642\u0627\u0626\u0642)", name: "duration", type: "number", value: formData.duration || '', onChange: handleFormChange, fullWidth: true })] })] }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => {
+                }, children: subservices.map((subservice) => (_jsxs(Card, { sx: { height: '100%', display: 'flex', flexDirection: 'column' }, children: [_jsx(CardMedia, { component: "img", height: "200", image: subservice.imageUrl || '/placeholder-image.jpg', alt: subservice.name }), _jsxs(CardContent, { sx: { flexGrow: 1 }, children: [_jsx(Typography, { gutterBottom: true, variant: "h5", children: subservice.name }), _jsx(Typography, { variant: "body2", color: "text.secondary", paragraph: true, children: subservice.description }), subservice.price && _jsx(Chip, { label: `$${subservice.price}`, color: "primary", sx: { mr: 1 } }), subservice.duration && _jsx(Chip, { label: `${subservice.duration} دقيقة`, sx: { mr: 1 } }), subservice.category && _jsx(Chip, { label: subservice.category, variant: "outlined" })] }), _jsxs(Box, { sx: { p: 2, display: 'flex', justifyContent: 'space-between' }, children: [_jsx(Button, { startIcon: _jsx(Edit, {}), onClick: () => handleEditClick(subservice), variant: "outlined", color: "primary", children: "\u062A\u0639\u062F\u064A\u0644" }), _jsx(Button, { startIcon: _jsx(Delete, {}), onClick: () => handleDeleteClick(subservice), variant: "outlined", color: "error", children: "\u062D\u0630\u0641" })] })] }, subservice.id))) }), _jsxs(Dialog, { open: editMode, onClose: () => setEditMode(false), maxWidth: "sm", fullWidth: true, children: [_jsx(DialogTitle, { children: "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062E\u062F\u0645\u0629 \u0627\u0644\u0641\u0631\u0639\u064A\u0629" }), _jsx(DialogContent, { children: _jsxs(Stack, { spacing: 3, sx: { mt: 2 }, children: [imagePreview && (_jsx(Box, { sx: { display: 'flex', justifyContent: 'center' }, children: _jsx("img", { src: imagePreview, alt: "Preview", style: { maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' } }) })), _jsxs(Button, { variant: "contained", component: "label", fullWidth: true, children: [imageFile ? 'تغيير الصورة' : 'اختر صورة', _jsx("input", { type: "file", hidden: true, accept: "image/*", onChange: handleImageChange })] }), _jsx(TextField, { label: "\u0627\u0644\u0627\u0633\u0645", name: "name", value: formData.name || '', onChange: handleFormChange, fullWidth: true, required: true }), _jsx(TextField, { label: "\u0627\u0644\u0648\u0635\u0641", name: "description", value: formData.description || '', onChange: handleFormChange, fullWidth: true, multiline: true, rows: 4 }), _jsxs(Box, { display: "flex", gap: 2, children: [_jsx(TextField, { label: "\u0627\u0644\u0633\u0639\u0631", name: "price", type: "number", value: formData.price || '', onChange: handleFormChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u062F\u0629 (\u062F\u0642\u0627\u0626\u0642)", name: "duration", type: "number", value: formData.duration || '', onChange: handleFormChange, fullWidth: true })] })] }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => {
                                     setEditMode(false);
                                     setImageFile(null);
                                     setImagePreview(null);

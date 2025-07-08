@@ -1,3 +1,3 @@
 import React from 'react';
-declare const CategorySinglePage: React.FC;
-export default CategorySinglePage;
+declare const ServiceSinglePage: React.FC;
+export default ServiceSinglePage;

@@ -12,7 +12,7 @@ import { Add, Edit, Delete, ArrowBack } from '@mui/icons-material';
 import SubserviceAddForm from './addSubSerivceForm';
 
 interface Subservice {
-  _id: string;
+  id: string;
   name: string;
   description?: string;
   imageUrl?: string;
@@ -42,6 +42,8 @@ const SubservicesPage: React.FC = () => {
           headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         const data = await response.json();
+        console.log(data);
+        
         setSubservices(data);
       } catch (error) {
         console.error('حدث خطأ أثناء جلب البيانات:', error);
@@ -61,11 +63,11 @@ const SubservicesPage: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!selectedSubservice) return;
     try {
-      await fetch(`http://localhost:3000/subServices/${selectedSubservice._id}`, {
+      await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
-      setSubservices(subservices.filter(s => s._id !== selectedSubservice._id));
+      setSubservices(subservices.filter(s => s.id !== selectedSubservice.id));
     } catch (error) {
       console.error('حدث خطأ أثناء الحذف:', error);
     } finally {
@@ -119,7 +121,7 @@ const SubservicesPage: React.FC = () => {
         formDataToSend.append('image', imageFile);
       }
       
-      const response = await fetch(`http://localhost:3000/subservices/${selectedSubservice._id}`, {
+      const response = await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
@@ -128,7 +130,7 @@ const SubservicesPage: React.FC = () => {
       });
       
       const updated = await response.json();
-      setSubservices(subservices.map(s => s._id === updated._id ? updated : s));
+      setSubservices(subservices.map(s => s.id === updated.id ? updated : s));
       setEditMode(false);
       setImageFile(null);
       setImagePreview(null);
@@ -169,7 +171,7 @@ const SubservicesPage: React.FC = () => {
         }}
       >
         {subservices.map((subservice) => (
-          <Card key={subservice._id} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Card key={subservice.id} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <CardMedia
               component="img"
               height="200"

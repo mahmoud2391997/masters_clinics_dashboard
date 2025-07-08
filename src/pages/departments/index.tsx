@@ -2,63 +2,124 @@ import React, { useEffect, useState } from "react";
 import {
   TextField,
   Button,
+  Checkbox,
+  FormControlLabel,
+  CircularProgress,
+  Box,
+  IconButton,
   Dialog,
-  DialogActions,
-  DialogContent,
   DialogTitle,
-  Typography
+  DialogContent,
+  DialogActions,
+  LinearProgress
 } from "@mui/material";
 import axios from "axios";
 import CardStats from "./card";
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { Cancel, Close } from "@mui/icons-material";
+import { Save } from "lucide-react";
+import { Typography } from "@mui/material";
+
+interface Branch {
+  id: number;
+  name: string;
+}
 
 interface DepartmentStat {
   id: number;
+  name: string;
   description: string;
   image?: string;
-  name: string;
-  doctorsCount: number;
-  patientsCount: number;
-  appointmentsCount: number;
+  branch_ids?: number[];
 }
 
 const DepartmentsStatsGrid: React.FC = () => {
   const [departments, setDepartments] = useState<DepartmentStat[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>("");
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
-  const [departmentToDelete, setDepartmentToDelete] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<boolean>(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptDesc, setNewDeptDesc] = useState('');
   const [newDeptImageFile, setNewDeptImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
+    fetchBranches();
   }, []);
 
-  const fetchDepartments = async () => {
-    setLoading(true);
+const fetchDepartments = async () => {
+  setLoading(true);
+  try {
+    const res = await axios.get("http://localhost:3000/departments", {
+      headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
+    });
+
+  const parsedDepartments = res.data.map((dept: any) => ({
+  ...dept,
+  branch_ids: typeof dept.branch_ids === "string" && dept.branch_ids !== ""
+    ? JSON.parse(dept.branch_ids)
+    : Array.isArray(dept.branch_ids)
+    ? dept.branch_ids
+    : [],
+}));
+setDepartments(parsedDepartments);
+
+  } catch (error) {
+    console.error("خطأ في جلب الأقسام:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  const fetchBranches = async () => {
     try {
-      const res = await axios.get<DepartmentStat[]>("http://localhost:3000/departments", {
-        headers: {
-          "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
-        }
+      const res = await axios.get("http://localhost:3000/branches", {
+        headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
       });
-      setDepartments(res.data);
+      setBranches(res.data);
     } catch (error) {
-      console.error("Error fetching departments:", error);
-      setDepartments([]);
-    } finally {
-      setLoading(false);
+      console.error("خطأ في جلب الفروع:", error);
     }
   };
 
-  const handleAddDepartment = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // تحقق من نوع الصورة
+      if (!file.type.match('image.*')) {
+        alert('يرجى اختيار ملف صورة (JPEG, PNG, إلخ)');
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('يجب أن يكون حجم الصورة أقل من 5 ميجابايت');
+        return;
+      }
+
+      setNewDeptImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setNewDeptImageFile(null);
+    setImagePreview(null);
+  };
+
+  const handleAddDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newDeptName.trim()) return;
     setAdding(true);
 
@@ -69,18 +130,17 @@ const DepartmentsStatsGrid: React.FC = () => {
       if (newDeptImageFile) {
         formData.append("image", newDeptImageFile);
       }
+      formData.append("branch_ids", JSON.stringify(selectedBranchIds));
 
-      const res = await axios.post<DepartmentStat>("http://localhost:3000/departments", formData, {
-        headers: {
-          "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
-        }
+      const res = await axios.post("http://localhost:3000/departments", formData, {
+        headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
       });
 
       setDepartments((prev) => [...prev, res.data]);
       resetModalFields();
       setShowAddModal(false);
     } catch (error) {
-      console.error("Error adding department:", error);
+      console.error("خطأ في إضافة القسم:", error);
     } finally {
       setAdding(false);
     }
@@ -90,52 +150,36 @@ const DepartmentsStatsGrid: React.FC = () => {
     setNewDeptName('');
     setNewDeptDesc('');
     setNewDeptImageFile(null);
+    setImagePreview(null);
+    setSelectedBranchIds([]);
   };
-
-  const handleConfirmDelete = async () => {
-    if (!departmentToDelete) return;
-    setDeleting(true);
-    try {
-      // You should also call API to actually delete from server
-      await axios.delete(`http://localhost:3000/departments/${departmentToDelete}`, {
-        headers: {
-          "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
-        }
-      });
-      setDepartments(prev => prev.filter(dept => dept.id !== departmentToDelete));
-      setDeleteConfirmOpen(false);
-    } catch (error) {
-      console.error("Error deleting department:", error);
-    } finally {
-      setDeleting(false);
-      setDepartmentToDelete(null);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setDeleteConfirmOpen(false);
-    setDepartmentToDelete(null);
-  };
-
-  if (loading) {
-    return null;
-  }
 
   const filteredDepartments = departments.filter((department) =>
     department.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) return (
+    <Box display="flex" justifyContent="center" mt={4}>
+      <CircularProgress />
+    </Box>
   );
 
   return (
     <>
       <div className="p-5 flex gap-4 items-center">
         <TextField
-          label="بحث عن الأقسام"
+          label="بحث عن قسم"
           variant="outlined"
           fullWidth
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button variant="contained" color="primary" onClick={() => setShowAddModal(true)}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => setShowAddModal(true)}
+          startIcon={<AddPhotoAlternateIcon />}
+        >
           إضافة قسم
         </Button>
       </div>
@@ -144,130 +188,179 @@ const DepartmentsStatsGrid: React.FC = () => {
         {filteredDepartments.map((department) => (
           <CardStats
             key={department.id}
-            department={{
-              _id: department.id.toString(),
-              name: department.name,
-              description: department.description,
-              image: department.image,
-              // Optionally add imageUrl if needed
-            }}
-            onDeleteSuccess={fetchDepartments}
+            department={department}
+            branches={branches}
             onUpdateSuccess={fetchDepartments}
+            onDeleteSuccess={fetchDepartments}
           />
         ))}
       </div>
 
-      {/* Add Department Modal */}
-      {showAddModal && (
-        <div className="fixed h-screen inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">إضافة قسم جديد</h2>
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  resetModalFields();
-                }}
-                className="text-gray-500 hover:text-gray-700 transition"
-                aria-label="إغلاق"
+      {/* نافذة إضافة قسم */}
+      <Dialog
+        open={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          resetModalFields();
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">إضافة قسم جديد</Typography>
+            <IconButton onClick={() => {
+              setShowAddModal(false);
+              resetModalFields();
+            }}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <form onSubmit={handleAddDepartment}>
+          <DialogContent dividers>
+            {adding && <LinearProgress />}
+            
+            <Box mb={3}>
+              <TextField
+                fullWidth
+                label="اسم القسم"
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                margin="normal"
+                required
+                variant="outlined"
+              />
+              
+              <TextField
+                fullWidth
+                label="الوصف"
+                value={newDeptDesc}
+                onChange={(e) => setNewDeptDesc(e.target.value)}
+                margin="normal"
+                multiline
+                rows={4}
+                variant="outlined"
+              />
+            </Box>
+            
+            <Box mb={3}>
+              <Typography variant="subtitle1" gutterBottom>
+                صورة القسم
+              </Typography>
+              
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<CloudUploadIcon />}
+                fullWidth
+                sx={{ mb: 2 }}
               >
-                <span className="text-xl">&times;</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddDepartment} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 mb-1">اسم القسم</label>
-                <input
-                  type="text"
-                  value={newDeptName}
-                  onChange={(e) => setNewDeptName(e.target.value)}
-                  placeholder="مثال: القلب"
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">الوصف</label>
-                <textarea
-                  value={newDeptDesc}
-                  onChange={(e) => setNewDeptDesc(e.target.value)}
-                  placeholder="أدخل وصفًا للقسم"
-                  rows={3}
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">صورة القسم</label>
+                رفع صورة
                 <input
                   type="file"
+                  hidden
                   accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setNewDeptImageFile(file);
-                    }
-                  }}
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={handleImageChange}
                 />
-              </div>
-
-              {newDeptImageFile && (
-                <div className="mt-2">
-                  <p className="text-gray-600 text-sm mb-1">معاينة الصورة:</p>
+              </Button>
+              
+              {imagePreview && (
+                <Box 
+                  mt={2} 
+                  textAlign="center"
+                  position="relative"
+                >
                   <img
-                    src={URL.createObjectURL(newDeptImageFile)}
-                    alt="معاينة صورة القسم"
-                    className="w-full max-h-24 object-contain border rounded shadow-sm"
+                    src={imagePreview}
+                    alt="معاينة"
+                    style={{ 
+                      maxHeight: '200px', 
+                      maxWidth: '100%', 
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0'
+                    }}
                   />
-                </div>
+                  <IconButton
+                    onClick={handleRemoveImage}
+                    color="error"
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.9)'
+                      }
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetModalFields();
-                  }}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                  disabled={adding}
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400"
-                  disabled={adding}
-                >
-                  {adding ? 'جاري الإضافة...' : 'إضافة'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <Dialog open={deleteConfirmOpen} onClose={handleCancelDelete}>
-        <DialogTitle>تأكيد الحذف</DialogTitle>
-        <DialogContent>
-          <Typography>هل أنت متأكد أنك تريد حذف هذا القسم؟</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete} color="primary" disabled={deleting}>
-            إلغاء
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="error"
-            startIcon={<DeleteIcon />}
-            disabled={deleting}
-          >
-            {deleting ? 'جاري الحذف...' : 'حذف'}
-          </Button>
-        </DialogActions>
+            </Box>
+            
+            <Box mb={2}>
+              <Typography variant="subtitle1" gutterBottom>
+                ربط بالفروع
+              </Typography>
+              
+              <Box
+                sx={{
+                  maxHeight: 200,
+                  overflow: 'auto',
+                  p: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1
+                }}
+              >
+                {branches.map((branch) => (
+                  <FormControlLabel
+                    key={branch.id}
+                    control={
+                      <Checkbox
+                        checked={selectedBranchIds.includes(branch.id)}
+                        onChange={() => {
+                          setSelectedBranchIds(prev =>
+                            prev.includes(branch.id)
+                              ? prev.filter(id => id !== branch.id)
+                              : [...prev, branch.id]
+                          );
+                        }}
+                      />
+                    }
+                    label={branch.name}
+                    sx={{ display: 'block', mr: 0 }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          </DialogContent>
+          
+          <DialogActions>
+            <Button 
+              onClick={() => {
+                setShowAddModal(false);
+                resetModalFields();
+              }}
+              startIcon={<Cancel />}
+              disabled={adding}
+            >
+              إلغاء
+            </Button>
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              startIcon={<Save />}
+              disabled={adding}
+            >
+              {adding ? <CircularProgress size={24} /> : 'إضافة القسم'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </>
   );

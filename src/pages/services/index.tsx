@@ -1,121 +1,153 @@
 import { useState, useEffect } from "react";
 import ServiceCard from "../../components/serviceCard";
-import { message } from "antd";
+import { message, Select } from "antd";
 
 interface Service {
-  _id: string;
-  id: number;
-  name: string;
+  id: string;
+  title: string;
+  subtitle?: string;
   description: string;
-  image?: string;
+  capabilities: string[];
+  approach: string;
   doctors_ids: string[];
   branches: string[];
+  department_id?: number;
+  image?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
 }
 
 interface Doctor {
   id: string;
   name: string;
-  branches: string[];
+}
+
+interface Branch {
+  id: string;
+  name: string;
 }
 
 export default function AddService() {
-  // Form State
-  const [name, setName] = useState("");
+  // Form state
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
+  const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [approach, setApproach] = useState("");
+  const [departmentId, setDepartmentId] = useState<number | undefined>();
+  const [newCapability, setNewCapability] = useState("");
+
+  // Media state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>("");
+  
+  // Selection state
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [selectedDoctors, setSelectedDoctors] = useState<string[]>([]);
-  const [selectedDoctorNames, setSelectedDoctorNames] = useState<string[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
 
-  // Data loading
+  // Data state
   const [services, setServices] = useState<Service[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
-  const [availableBranches, setAvailableBranches] = useState<{ name: string }[]>([]);
-  const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
+  const [allBranches, setAllBranches] = useState<Branch[]>([]);
 
+  // UI state
+  const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [isLoading, setIsLoading] = useState({
-    doctors: false,
-    branches: false,
     services: false,
+    departments: false,
+    doctors: false,
+    branches: false
   });
 
-  const [error, setError] = useState<string | null>(null);
-  const [editingService, setEditingService] = useState<Service | null>(null);
-
-  // Fetch data on mount
+  // Load initial data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading({ doctors: true, branches: true, services: true });
-        setError(null);
-
-        // Fetch doctors
-        const doctorsRes = await fetch("http://localhost:3000/doctors", {
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-          },
+        setIsLoading({
+          services: true,
+          departments: true,
+          doctors: true,
+          branches: true
         });
-        if (!doctorsRes.ok) throw new Error("فشل تحميل بيانات الأطباء");
-        const doctorsDataRaw: Doctor[] = await doctorsRes.json();
-        setAllDoctors(doctorsDataRaw);
 
-        // Extract unique branch names
-        const uniqueBranchNames = Array.from(
-          new Set(doctorsDataRaw.flatMap((d) => d.branches))
-        );
-        const branchObjects = uniqueBranchNames.map((name) => ({
-          name,
-        }));
-        setAvailableBranches(branchObjects);
+        // Fetch all data in parallel
+        const [servicesRes, departmentsRes, doctorsRes, branchesRes] = await Promise.all([
+          fetch("http://localhost:3000/services", {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+          }),
+          fetch("http://localhost:3000/departments", {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+          }),
+          fetch("http://localhost:3000/doctors", {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+          }),
+          fetch("http://localhost:3000/branches", {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+          })
+        ]);
 
-        // Fetch services
-        const servicesRes = await fetch("http://localhost:3000/services", {
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-          },
-        });
-        if (!servicesRes.ok) throw new Error("فشل تحميل بيانات الخدمات");
+        if (!servicesRes.ok) throw new Error("فشل تحميل الخدمات");
+        if (!departmentsRes.ok) throw new Error("فشل تحميل الأقسام");
+        if (!doctorsRes.ok) throw new Error("فشل تحميل الأطباء");
+        if (!branchesRes.ok) throw new Error("فشل تحميل الفروع");
+
         const servicesData = await servicesRes.json();
-        setServices(servicesData);
+        const departmentsData = await departmentsRes.json();
+        const doctorsData = await doctorsRes.json();
+        const branchesData = await branchesRes.json();
+
+        // Normalize services data
+        const normalizedServices = servicesData.map((service: any) => ({
+          ...service,
+          id: String(service.id),
+          branches: service.branches ? JSON.parse(service.branches) : [],
+          doctors_ids: service.doctors_ids ? JSON.parse(service.doctors_ids) : [],
+          capabilities: service.capabilities ? JSON.parse(service.capabilities) : [],
+          department_id: service.department_id || undefined
+        }));
+
+        setServices(normalizedServices);
+        setDepartments(departmentsData);
+        setAllDoctors(doctorsData.map((d: any) => ({ ...d, id: String(d.id) })));
+        setAllBranches(branchesData.map((b: any) => ({ ...b, id: String(b.id) })));
+
       } catch (err) {
-        setError("فشل تحميل البيانات الأولية. لا يزال بإمكانك إضافة خدمات.");
-        console.error("خطأ أثناء جلب البيانات:", err);
+        setError(err instanceof Error ? err.message : "فشل تحميل البيانات");
+        console.error("Error fetching data:", err);
       } finally {
-        setIsLoading({ doctors: false, branches: false, services: false });
+        setIsLoading({
+          services: false,
+          departments: false,
+          doctors: false,
+          branches: false
+        });
       }
     };
 
     fetchData();
   }, []);
 
-  // Filter doctors by selected branches
-  useEffect(() => {
-    if (selectedBranches.length === 0) {
-      setFilteredDoctors(allDoctors);
-    } else {
-      const filtered = allDoctors.filter((doctor) =>
-        doctor.branches.some((branchName) => selectedBranches.includes(branchName))
-      );
-      setFilteredDoctors(filtered);
-    }
-  }, [selectedBranches, allDoctors]);
-
-  // Handle image change
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const validTypes = ["image/jpeg", "image/png", "image/gif"];
     if (!validTypes.includes(file.type)) {
-      setError("يرجى رفع صورة صالحة (JPEG، PNG، GIF)");
+      setError("يرجى رفع صورة بصيغة صحيحة (JPEG, PNG, GIF)");
       return;
     }
 
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError("يجب أن تكون الصورة أقل من 5 ميجا بايت");
+      setError("حجم الصورة يجب أن يكون أقل من 5 ميجا");
       return;
     }
 
@@ -129,111 +161,107 @@ export default function AddService() {
     reader.readAsDataURL(file);
   };
 
-  // Reset form fields
   const resetForm = () => {
-    setName("");
+    setTitle("");
+    setSubtitle("");
     setDescription("");
+    setCapabilities([]);
+    setApproach("");
+    setDepartmentId(undefined);
     setImageFile(null);
     setImagePreview(undefined);
     setSelectedBranches([]);
     setSelectedDoctors([]);
-    setSelectedDoctorNames([]);
     setIsEditing(false);
     setEditingService(null);
   };
 
-  // Add new service
-  const handleAddService = async (e: React.FormEvent) => {
+  const handleAddCapability = () => {
+    if (newCapability.trim()) {
+      setCapabilities([...capabilities, newCapability.trim()]);
+      setNewCapability("");
+    }
+  };
+
+  const handleRemoveCapability = (index: number) => {
+    setCapabilities(capabilities.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(prev => ({...prev, services: true}));
 
     const formData = new FormData();
-    formData.append("name", name);
+    formData.append("title", title);
+    formData.append("subtitle", subtitle || "");
     formData.append("description", description);
-    if (imageFile) formData.append("image", imageFile);
+    formData.append("capabilities", JSON.stringify(capabilities));
+    formData.append("approach", approach);
     formData.append("doctors_ids", JSON.stringify(selectedDoctors));
     formData.append("branches", JSON.stringify(selectedBranches));
+    if (departmentId) formData.append("department_id", departmentId.toString());
+    if (imageFile) formData.append("image", imageFile);
 
     try {
-      const response = await fetch("http://localhost:3000/services", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+      const url = isEditing && editingService
+        ? `http://localhost:3000/services/${editingService.id}`
+        : "http://localhost:3000/services";
+
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { 
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`
         },
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "فشل إضافة الخدمة");
+        throw new Error(errorData.message || (isEditing ? "فشل تحديث الخدمة" : "فشل إضافة الخدمة"));
       }
 
       const savedService = await response.json();
-      setServices((prev) => [...prev, savedService]);
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل إضافة الخدمة");
-      console.error(err);
-    }
-  };
+      const normalizedService = {
+        ...savedService,
+        id: String(savedService.id),
+        branches: savedService.branches ? JSON.parse(savedService.branches) : [],
+        doctors_ids: savedService.doctors_ids ? JSON.parse(savedService.doctors_ids) : [],
+        capabilities: savedService.capabilities ? JSON.parse(savedService.capabilities) : [],
+        department_id: savedService.department_id || undefined
+      };
 
-  // Edit existing service
-  const handleEditService = async () => {
-    if (!editingService || !name || !description || selectedDoctors.length === 0) return;
-
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("description", description);
-    if (imageFile) formData.append("image", imageFile);
-    formData.append("doctors_ids", JSON.stringify(selectedDoctors));
-    formData.append("branches", JSON.stringify(selectedBranches));
-
-    try {
-      const serviceId = editingService._id || String(editingService.id);
-      const response = await fetch(`http://localhost:3000/services/${serviceId}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "فشل تعديل الخدمة");
-      }
-
-      const updatedService = await response.json();
-      setServices((prev) =>
-        prev.map((s) =>
-          s._id === updatedService._id || s.id === updatedService.id
-            ? updatedService
-            : s
-        )
+      setServices(prev => 
+        isEditing
+          ? prev.map(s => s.id === normalizedService.id ? normalizedService : s)
+          : [...prev, normalizedService]
       );
 
-      message.success("تم تحديث الخدمة بنجاح");
       resetForm();
+      message.success(isEditing ? "تم تحديث الخدمة بنجاح" : "تم إضافة الخدمة بنجاح");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل تعديل الخدمة");
+      setError(err instanceof Error ? err.message : "فشل حفظ الخدمة");
       console.error(err);
+    } finally {
+      setIsLoading(prev => ({...prev, services: false}));
     }
   };
 
-  // Delete service
-  const handleDeleteService = async (id: number) => {
-    if (!window.confirm("هل أنت متأكد من رغبتك في حذف هذه الخدمة؟")) return;
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذه الخدمة؟")) return;
 
     try {
       const response = await fetch(`http://localhost:3000/services/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-        },
+        headers: { 
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`
+        }
       });
 
       if (!response.ok) throw new Error("فشل حذف الخدمة");
 
-      setServices((prev) => prev.filter((service) => service.id !== id));
+      setServices(prev => prev.filter(service => service.id !== id));
       message.success("تم حذف الخدمة بنجاح");
     } catch (err) {
       setError(err instanceof Error ? err.message : "فشل حذف الخدمة");
@@ -243,7 +271,6 @@ export default function AddService() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6" dir="rtl">
-      {/* Error Message */}
       {error && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
           <p>{error}</p>
@@ -253,240 +280,219 @@ export default function AddService() {
         </div>
       )}
 
-      {/* Add/Edit Form */}
-      <form onSubmit={handleAddService} className="space-y-4 bg-white shadow p-6 rounded-xl">
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white shadow p-6 rounded-xl">
         <h2 className="text-xl font-semibold text-gray-800">
           {isEditing ? "تعديل الخدمة" : "إضافة خدمة جديدة"}
         </h2>
 
-        {/* Name */}
         <div>
-          <label className="block text-gray-700">الاسم</label>
+          <label className="block text-gray-700">العنوان*</label>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             className="w-full border px-3 py-2 rounded"
             required
           />
         </div>
 
-        {/* Description */}
         <div>
-          <label className="block text-gray-700">الوصف</label>
+          <label className="block text-gray-700">العنوان الفرعي</label>
+          <input
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">الوصف*</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full border px-3 py-2 rounded"
+            rows={4}
             required
           />
         </div>
 
-        {/* Image Upload */}
         <div>
-          <label className="block text-gray-700">الصورة</label>
+          <label className="block text-gray-700">المميزات</label>
+          <div className="flex gap-2 mb-2">
+            <input
+              value={newCapability}
+              onChange={(e) => setNewCapability(e.target.value)}
+              className="flex-1 border px-3 py-2 rounded"
+              placeholder="أضف مميزة جديدة"
+            />
+            <button
+              type="button"
+              onClick={handleAddCapability}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              إضافة
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {capabilities.map((cap, index) => (
+              <div key={index} className="bg-gray-100 px-3 py-1 rounded-full flex items-center">
+                {cap}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveCapability(index)}
+                  className="mr-2 text-red-500"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-gray-700">النهج المتبع*</label>
+          <textarea
+            value={approach}
+            onChange={(e) => setApproach(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+            rows={4}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">القسم</label>
+          <Select
+            value={departmentId}
+            onChange={(value) => setDepartmentId(value)}
+            className="w-full"
+            options={departments.map(dep => ({
+              value: dep.id,
+              label: dep.name
+            }))}
+            placeholder="اختر القسم"
+            allowClear
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">صورة الخدمة</label>
           <input
             type="file"
             accept="image/*"
             onChange={handleImageChange}
-            className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100"
+            className="block w-full text-sm text-gray-500"
           />
           {imagePreview && (
-            <img src={imagePreview} alt="معاينة" className="mt-2 h-32 rounded border" />
+            <img
+              src={imagePreview}
+              alt="معاينة الصورة"
+              className="mt-2 h-32 rounded border object-cover"
+            />
           )}
         </div>
 
-        {/* Branch Selection */}
-        <div className="relative">
-          <select
-            value=""
-            className="w-full border px-3 py-2 rounded"
-            onChange={(e) => {
-              const value = e.target.value;
-              if (!selectedBranches.includes(value)) {
-                setSelectedBranches([...selectedBranches, value]);
-              }
-            }}
-          >
-            <option value="" disabled>اختر فرع</option>
-            {availableBranches.map((branch) => (
-              <option key={branch.name} value={branch.name}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Selected Branch Tags */}
-          {selectedBranches.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {selectedBranches.map((branch) => (
-                <span
-                  key={branch}
-                  className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center"
-                >
-                  {branch}
-                  <button
-                    onClick={() => {
-                      const updatedBranches = selectedBranches.filter((b) => b !== branch);
-                      setSelectedBranches(updatedBranches);
-                      const updatedDoctors: string[] = [];
-                      const updatedDoctorNames: string[] = [];
-                      filteredDoctors.forEach((doctor) => {
-                        if (doctor.branches.some((b) => updatedBranches.includes(b))) {
-                          if (selectedDoctors.includes(doctor.id)) {
-                            updatedDoctors.push(doctor.id);
-                            updatedDoctorNames.push(doctor.name);
-                          }
-                        }
-                      });
-                      setSelectedDoctors(updatedDoctors);
-                      setSelectedDoctorNames(updatedDoctorNames);
-                    }}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
+        <div>
+          <label className="block text-gray-700">الفروع</label>
+          <Select
+            mode="multiple"
+            value={selectedBranches}
+            onChange={(values) => setSelectedBranches(values)}
+            className="w-full"
+            options={allBranches.map(branch => ({
+              value: branch.id,
+              label: branch.name
+            }))}
+            placeholder="اختر الفروع"
+            loading={isLoading.branches}
+          />
         </div>
 
-        {/* Doctor Selection */}
         <div>
           <label className="block text-gray-700">الأطباء</label>
-          {isLoading.doctors ? (
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>جارٍ تحميل الأطباء...</span>
-            </div>
-          ) : (
-            <>
-              <div className="relative">
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const doctor = filteredDoctors.find((d) => d.id === value);
-                    if (doctor && !selectedDoctors.includes(doctor.id)) {
-                      setSelectedDoctors([...selectedDoctors, doctor.id]);
-                      setSelectedDoctorNames([...selectedDoctorNames, doctor.name]);
-                    }
-                  }}
-                  disabled={selectedBranches.length === 0}
-                  className="w-full border px-3 py-2 rounded"
-                >
-                  <option value="" disabled>
-                    {selectedBranches.length === 0 ? "اختر فرع أولًا" : "اختر طبيبًا لإضافته"}
-                  </option>
-                  {filteredDoctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.name} ({doctor.branches.join(", ")})
-                    </option>
-                  ))}
-                </select>
-
-                {/* Selected Doctors Tags */}
-                {selectedDoctors.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedDoctorNames.map((name, index) => (
-                      <span
-                        key={name}
-                        className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm flex items-center"
-                      >
-                        {name}
-                        <button
-                          onClick={() => {
-                            const idToRemove = selectedDoctors[index];
-                            setSelectedDoctors(selectedDoctors.filter((id) => id !== idToRemove));
-                            setSelectedDoctorNames(selectedDoctorNames.filter((n) => n !== name));
-                          }}
-                          className="ml-2 text-red-500 hover:text-red-700"
-                        >
-                          &times;
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+          <Select
+            mode="multiple"
+            value={selectedDoctors}
+            onChange={(values) => setSelectedDoctors(values)}
+            className="w-full"
+            options={allDoctors.map(doctor => ({
+              value: doctor.id,
+              label: doctor.name
+            }))}
+            placeholder="اختر الأطباء"
+            loading={isLoading.doctors}
+          />
         </div>
 
-        {/* Submit Button */}
-        <div className="flex justify-end">
-          {isEditing ? (
-            <div>
-              <button
-                type="button"
-                className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 mr-2"
-                onClick={handleEditService}
-                disabled={selectedDoctors.length === 0 || !name || !description}
-              >
-                تحديث الخدمة
-              </button>
-              <button
-                type="button"
-                className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
-                onClick={resetForm}
-              >
-                إلغاء
-              </button>
-            </div>
-          ) : (
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              إضافة خدمة
-            </button>
-          )}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={resetForm}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+          >
+            إعادة تعيين
+          </button>
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            disabled={isLoading.services}
+          >
+            {isLoading.services ? (
+              <span className="flex items-center">
+                <span className="animate-spin mr-2">↻</span>
+                {isEditing ? "جاري التحديث..." : "جاري الإضافة..."}
+              </span>
+            ) : isEditing ? "تحديث الخدمة" : "إضافة الخدمة"}
+          </button>
         </div>
       </form>
 
-      {/* Services List */}
       <div className="bg-white shadow p-6 rounded-xl">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">الخدمات</h3>
         {isLoading.services ? (
-          <div className="flex items-center justify-center p-4">
-            <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            <span className="mr-2">جارٍ تحميل الخدمات...</span>
+          <div className="flex justify-center p-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         ) : services.length === 0 ? (
-          <p className="text-gray-500">لا توجد خدمات مضافة حتى الآن</p>
+          <p className="text-gray-500">لا توجد خدمات مضافة</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {services.map((service) => (
               <ServiceCard
-                key={service._id || service.id}
+                key={service.id}
                 category={{
-                  id: service._id || service.id,
-                  name: service.name,
+                  id: service.id,
+                  name: service.title,
                   description: service.description,
-                  imageUrl: service.image || "",
-                  doctors: allDoctors.filter((d) => service.doctors_ids.includes(d.id)),
-                  branches: service.branches.map((b) => ({ name: b })),
+                  imageUrl: service.image ? `http://localhost:3000${service.image}` : "",
+                  capabilities: service.capabilities,
+                  approach: service.approach,
+                  doctors: service.doctors_ids.map(id => {
+                    const doctor = allDoctors.find(d => d.id === id);
+                    return { id, name: doctor?.name || "غير معروف" };
+                  }),
+                  branches: service.branches.map(id => {
+                    const branch = allBranches.find(b => b.id === id);
+                    return { id, name: branch?.name || "غير معروف" };
+                  }),
+                  department: service.department_id 
+                    ? departments.find(d => d.id === service.department_id)?.name
+                    : undefined
                 }}
                 handleEdit={() => {
                   setIsEditing(true);
                   setEditingService(service);
-                  setName(service.name);
+                  setTitle(service.title);
+                  setSubtitle(service.subtitle || "");
                   setDescription(service.description);
-                  setImagePreview(service.image);
+                  setCapabilities(service.capabilities);
+                  setApproach(service.approach);
+                  setDepartmentId(service.department_id);
                   setSelectedBranches(service.branches);
                   setSelectedDoctors(service.doctors_ids);
-                  const doctorNames = service.doctors_ids
-                    .map((id) => allDoctors.find((d) => d.id === id)?.name)
-                    .filter(Boolean) as string[];
-                  setSelectedDoctorNames(doctorNames);
+                  setImagePreview(service.image ? `http://localhost:3000${service.image}` : undefined);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                handleDelete={() => handleDeleteService(service.id)}
+                handleDelete={() => handleDelete(service.id)}
               />
             ))}
           </div>

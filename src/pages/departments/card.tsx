@@ -1,284 +1,294 @@
-import { useState, type ChangeEvent } from "react";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Typography,
+  CardMedia,
+  IconButton,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Chip,
+  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  LinearProgress,
+  Snackbar,
+  Alert,
+  Tooltip,
+  Box,
+  Divider,
+  CircularProgress
+} from "@mui/material";
+import {
+  Delete,
+  Edit,
+  Close,
+  Save,
+  Cancel,
+  CloudUpload,
+  Business
+} from "@mui/icons-material";
+import { styled } from "@mui/material/styles";
 import axios from "axios";
 
-export const updateDepartment = async (_id: string, department: FormData) => {
-    const response = await axios.put(`http://localhost:3000/departments/${_id}`, department, {
-        headers: {
-            "Authorization": `Bearer ${sessionStorage.getItem("token")}`,
-        }
-    });
-    return response.data;
-};
-
-export const deleteDepartment = async (_id: string) => {
-    const response = await axios.delete(`http://localhost:3000/departments/${_id}`, {
-        headers: {
-            "Authorization": `Bearer ${sessionStorage.getItem("token")}`
-        }
-    });
-    return response.data;
-};
-
-interface Department {
-    _id: string;
-    name: string;
-    description: string;
-    image?: string;
-    imageUrl?: string;
+interface Branch {
+  id: number;
+  name: string;
 }
 
-interface CardStatsProps {
-    department: Department;
-    onDeleteSuccess?: () => void;
-    onUpdateSuccess?: () => void;
+interface DepartmentStat {
+  id: number;
+  name: string;
+  description: string;
+  image?: string;
+  branch_ids?: number[] | string;
 }
 
-export default function CardStats({ department, onUpdateSuccess, onDeleteSuccess }: CardStatsProps) {
-    const [showModal, setShowModal] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [editName, setEditName] = useState(department.name);
-    const [editDesc, setEditDesc] = useState(department.description);
-    const [editImage, setEditImage] = useState(department.imageUrl || department.image);
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imageUrlInput, setImageUrlInput] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
+interface Props {
+  department: DepartmentStat;
+  branches: Branch[];
+  onUpdateSuccess: () => void;
+  onDeleteSuccess: () => void;
+}
 
-    const handleEditClick = () => {
-        setEditName(department.name);
-        setEditDesc(department.description);
-        setEditImage(department.imageUrl || department.image);
-        setImageFile(null);
-        setImageUrlInput("");
-        setShowModal(true);
-    };
+const VisuallyHiddenInput = styled('input')({
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  height: 1,
+  overflow: 'hidden',
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  whiteSpace: 'nowrap',
+  width: 1,
+});
 
-    const handleDeleteClick = () => {
-        setShowDeleteConfirm(true);
-    };
+const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onDeleteSuccess }) => {
+  const parseBranchIds = (branchIds: number[] | string | undefined): number[] => {
+    if (!branchIds) return [];
+    if (Array.isArray(branchIds)) return branchIds;
+    if (typeof branchIds === 'string') {
+      try {
+        return JSON.parse(branchIds) || [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
 
-    const handleConfirmDelete = async () => {
-        setIsDeleting(true);
-        try {
-            await deleteDepartment(department._id);
-            onDeleteSuccess?.();
-            setShowDeleteConfirm(false);
-        } catch (error) {
-            console.error('Error deleting department:', error);
-        } finally {
-            setIsDeleting(false);
-        }
-    };
+  const initialBranchIds = parseBranchIds(department.branch_ids);
 
-    const handleImageFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            setEditImage(URL.createObjectURL(file));
-            setImageUrlInput("");
-        }
-    };
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(department.name);
+  const [description, setDescription] = useState(department.description);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>(initialBranchIds);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(true);
 
-    const handleImageUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
-        setImageUrlInput(e.target.value);
-        setEditImage(e.target.value);
-        setImageFile(null);
-    };
+  useEffect(() => {
+    setSelectedBranchIds(parseBranchIds(department.branch_ids));
+  }, [editing, department.branch_ids]);
 
-    const handleSave = async () => {
-        setIsLoading(true);
-        try {
-            const formData = new FormData();
-            formData.append('name', editName);
-            formData.append('description', editDesc);
-            
-            if (imageFile) {
-                formData.append('image', imageFile);
-            } else if (imageUrlInput) {
-                formData.append('imageUrl', imageUrlInput);
-            } else if (department.image) {
-                formData.append('image', department.image);
-            }
+  const handleDelete = async () => {
+    if (!window.confirm("هل أنت متأكد أنك تريد حذف هذا القسم؟")) return;
+    setDeleting(true);
+    try {
+      await axios.delete(`http://localhost:3000/departments/${department.id}`, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+      });
+      onDeleteSuccess();
+      setSuccess("تم حذف القسم بنجاح");
+    } catch (error) {
+      console.error("خطأ في حذف القسم:", error);
+      setError("فشل في حذف القسم");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-            await updateDepartment(department._id, formData);
-            setShowModal(false);
-            onUpdateSuccess?.();
-        } catch (error) {
-            console.error('Error updating department:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdating(true);
+    try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("description", description);
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+      formData.append("branch_ids", JSON.stringify(selectedBranchIds));
 
-    return (
-        <div className="min-w-[250px]">
-            <div className="relative flex flex-col min-w-0 break-words bg-gray-100 rounded mb-6 xl:mb-0 shadow-lg text-[var(--main-gray)]">
-                <div className="flex-auto p-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <img
-                            src={department.imageUrl || department.image || "https://via.placeholder.com/64x64.png?text=Dept"}
-                            alt={`${department.name || "Department"} image`}
-                            className="w-16 h-16 object-cover rounded-full border-2 border-white shadow-md"
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                className="text-blue-500 hover:text-blue-700"
-                                onClick={handleEditClick}
-                                title="Edit"
-                                type="button"
-                            >
-                                <FontAwesomeIcon icon={faEdit} />
-                            </button>
-                            <button
-                                className="text-red-500 hover:text-red-700"
-                                onClick={handleDeleteClick}
-                                title="Delete"
-                                type="button"
-                            >
-                                <FontAwesomeIcon icon={faTrash} />
-                            </button>
-                        </div>
-                    </div>
+      await axios.put(`http://localhost:3000/departments/${department.id}`, formData, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+      });
 
-                    <div className="relative w-full flex flex-col justify-between">
-                        <div className="w-full relative">
-                            <h4 className="text-xl font-semibold mb-1">{department.name || '-'}</h4>
-                            <p className="text-blueGray-400 text-sm">{department.description || '-'}</p>
-                        </div>
-                    </div>
-                </div>
+      onUpdateSuccess();
+      setEditing(false);
+      setSuccess("تم تحديث القسم بنجاح");
+      setPreviewImage(null);
+    } catch (error) {
+      console.error("خطأ في تحديث القسم:", error);
+      setError("فشل في تحديث القسم");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.match('image.*')) {
+        setError('يرجى اختيار ملف صورة (JPEG، PNG، إلخ)');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError('يجب ألا يزيد حجم الصورة عن 5 ميجابايت');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPreviewImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setPreviewImage(null);
+  };
+
+  const getBranchName = (id: number) => {
+    return branches.find(b => b.id === id)?.name || id.toString();
+  };
+
+  const currentBranchIds = parseBranchIds(department.branch_ids);
+
+  return (
+    <>
+      <Card className="shadow-md rounded-xl hover:shadow-lg transition-shadow duration-300">
+        {department.image ? (
+          <Box position="relative">
+            {imageLoading && (
+              <Box display="flex" justifyContent="center" alignItems="center" height="180px">
+                <CircularProgress />
+              </Box>
+            )}
+            <CardMedia
+              component="img"
+              height="180"
+              image={`http://localhost:3000${department.image}`}
+              alt={department.name}
+              className="object-cover"
+              onLoad={() => setImageLoading(false)}
+              style={{ display: imageLoading ? 'none' : 'block' }}
+            />
+          </Box>
+        ) : (
+          <Box display="flex" justifyContent="center" alignItems="center" height="180px" bgcolor="action.hover">
+            <Avatar sx={{ width: 60, height: 60 }}>
+              <Business fontSize="large" />
+            </Avatar>
+          </Box>
+        )}
+        <CardHeader
+          title={<Typography variant="h6" fontWeight="bold">{department.name}</Typography>}
+          subheader={<Box display="flex" alignItems="center" gap={1} mt={0.5}><Business fontSize="small" color="action" /><Typography variant="body2" color="text.secondary">{currentBranchIds.length} فروع</Typography></Box>}
+          action={
+            <div>
+              <Tooltip title="تعديل القسم">
+                <IconButton onClick={() => setEditing(true)} color="primary">
+                  <Edit />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="حذف القسم">
+                <IconButton onClick={handleDelete} color="error">
+                  {deleting ? <CircularProgress size={24} color="error" /> : <Delete />}
+                </IconButton>
+              </Tooltip>
             </div>
-
-            {/* Edit Modal */}
-            {showModal && (
-                <div className="fixed h-screen inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 animate-fade-in relative">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-gray-800">Edit Department</h2>
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="text-gray-500 hover:text-gray-700 transition"
-                                aria-label="Close"
-                            >
-                                <span className="text-xl">&times;</span>
-                            </button>
-                        </div>
-                        <form
-                            onSubmit={async (e) => {
-                                e.preventDefault();
-                                await handleSave();
-                            }}
-                            className="space-y-4"
-                        >
-                            <div>
-                                <label className="block text-gray-700 mb-1">Department Name</label>
-                                <input
-                                    type="text"
-                                    value={editName}
-                                    onChange={e => setEditName(e.target.value)}
-                                    placeholder="e.g. Cardiology"
-                                    className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-gray-700 mb-1">Description</label>
-                                <textarea
-                                    value={editDesc}
-                                    onChange={e => setEditDesc(e.target.value)}
-                                    placeholder="Enter department description"
-                                    rows={3}
-                                    className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-gray-700 mb-1">Department Image</label>
-                                <input
-                                    type="text"
-                                    value={imageUrlInput}
-                                    onChange={handleImageUrlChange}
-                                    placeholder="Or paste image URL here"
-                                    className="w-full border border-gray-300 px-3 py-2 rounded mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageFileChange}
-                                    className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            {editImage && (
-                                <div className="mt-2">
-                                    <p className="text-gray-600 text-sm mb-1">Image Preview:</p>
-                                    <img
-                                        src={editImage}
-                                        alt="Department preview"
-                                        className="w-full max-h-24 max-w-24 object-contain border rounded shadow-sm"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? 'Saving...' : 'Save'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+          }
+        />
+        <CardContent>
+          <Typography variant="body2" color="text.secondary" paragraph>{department.description}</Typography>
+          <Divider sx={{ my: 2 }} />
+          <div className="flex flex-wrap gap-2">
+            {currentBranchIds.length ? (
+              currentBranchIds.map(id => (
+                <Chip key={id} label={getBranchName(id)} size="small" variant="outlined" color="primary" />
+              ))
+            ) : (
+              <Typography variant="caption" color="text.disabled">لا توجد فروع محددة</Typography>
             )}
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-                <div className="fixed h-screen inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 animate-fade-in relative">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-gray-800">Confirm Delete</h2>
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="text-gray-500 hover:text-gray-700 transition"
-                                aria-label="Close"
-                            >
-                                <span className="text-xl">&times;</span>
-                            </button>
-                        </div>
-                        <p className="mb-4">Are you sure you want to delete this department?</p>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                                disabled={isDeleting}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleConfirmDelete}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? 'Deleting...' : 'Delete'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
+      <Dialog open={editing} onClose={() => { setEditing(false); setPreviewImage(null); }} fullWidth maxWidth="sm">
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">تعديل القسم</Typography>
+            <IconButton onClick={() => setEditing(false)}><Close /></IconButton>
+          </Box>
+        </DialogTitle>
+
+        <form onSubmit={handleUpdate}>
+          <DialogContent dividers>
+            {updating && <LinearProgress />}
+            <Box mb={3}>
+              <TextField fullWidth label="اسم القسم" value={name} onChange={(e) => setName(e.target.value)} margin="normal" required variant="outlined" />
+              <TextField fullWidth label="الوصف" value={description} onChange={(e) => setDescription(e.target.value)} margin="normal" multiline rows={4} variant="outlined" />
+            </Box>
+
+            <Box mb={3}>
+              <Typography variant="subtitle1" gutterBottom>صورة القسم</Typography>
+              <Button component="label" variant="outlined" startIcon={<CloudUpload />} fullWidth sx={{ mb: 2 }}>رفع صورة جديدة<VisuallyHiddenInput type="file" accept="image/*" onChange={handleImageChange} /></Button>
+              {(previewImage || department.image) && (
+                <Box mt={2} textAlign="center" position="relative">
+                  <img src={previewImage || `http://localhost:3000${department.image}`} alt="Preview" style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: '8px', border: '1px solid #e0e0e0' }} />
+                  <IconButton onClick={handleRemoveImage} color="error" sx={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.7)', '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' } }}><Delete fontSize="small" /></IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Box mb={2}>
+              <Typography variant="subtitle1" gutterBottom>تعيين للفروع</Typography>
+              <Box sx={{ maxHeight: 200, overflow: 'auto', p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                {branches.map((branch) => (
+                  <FormControlLabel key={branch.id} control={<Checkbox checked={selectedBranchIds.includes(branch.id)} onChange={() => { setSelectedBranchIds((prev) => prev.includes(branch.id) ? prev.filter((id) => id !== branch.id) : [...prev, branch.id]); }} />} label={branch.name} sx={{ display: 'block', mr: 0 }} />
+                ))}
+              </Box>
+            </Box>
+          </DialogContent>
+
+          <DialogActions>
+            <Button onClick={() => { setEditing(false); setPreviewImage(null); }} startIcon={<Cancel />} disabled={updating}>إلغاء</Button>
+            <Button type="submit" variant="contained" color="primary" startIcon={<Save />} disabled={updating}>{updating ? <CircularProgress size={24} /> : 'حفظ التغييرات'}</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>
+      </Snackbar>
+
+      <Snackbar open={!!success} autoHideDuration={6000} onClose={() => setSuccess(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity="success" onClose={() => setSuccess(null)}>{success}</Alert>
+      </Snackbar>
+    </>
+  );
+};
+
+export default CardStats;

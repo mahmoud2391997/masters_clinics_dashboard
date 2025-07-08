@@ -42,18 +42,26 @@ import {
 } from '@mui/icons-material';
 
 interface Service {
-  id: string;
+  id: number;
   name: string;
+  department_id?: number;
 }
 
 interface Doctor {
-  id: string;
+  id: number;
   name: string;
-  branches: string[];
+  branches: number[];
+  department_id?: number;
+}
+
+interface Branch {
+  id: number;
+  name: string;
+  address: string;
 }
 
 interface Offer {
-  id: string;
+  id: number;
   title: string;
   description: string;
   image: string;
@@ -61,8 +69,8 @@ interface Offer {
   priceAfter: string;
   discountPercentage: string;
   branches: string[];
-  services_ids: string[];
-  doctors_ids: string[];
+  services_ids: number[];
+  doctors_ids: number[];
   createdAt: {
     _seconds: number;
     _nanoseconds: number;
@@ -75,9 +83,9 @@ interface OfferFormData {
   priceBefore: number;
   priceAfter: number;
   discountPercentage: number;
-  branches: string[];
-  services_ids: string[];
-  doctors_ids: string[];
+  branches: number[];
+  services_ids: number[];
+  doctors_ids: number[];
   imageUrl: string;
   imageFile: File | null;
 }
@@ -89,7 +97,7 @@ interface OfferDialogProps {
   mode: 'view' | 'edit';
   onSave?: (updatedOffer: Offer) => void;
   services: Service[];
-  branches: string[];
+  branches: Branch[];
   doctors: Doctor[];
 }
 
@@ -120,9 +128,9 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate discount percentage
-  const calculateDiscount = (before: number, after: number) => {
-    return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
-  };
+const calculateDiscount = (before: number, after: number) => {
+  return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
+};
 
   // Filter doctors based on selected branches
   useEffect(() => {
@@ -130,7 +138,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
       setFilteredDoctors([]);
     } else {
       const filtered = allDoctors.filter(doctor =>
-        doctor.branches.some(branch => editData.branches.includes(branch))
+        doctor.branches.some(branchId => editData.branches.includes(branchId))
       );
       setFilteredDoctors(filtered);
     }
@@ -145,7 +153,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
         priceBefore: parseFloat(offer.priceBefore) || 0,
         priceAfter: parseFloat(offer.priceAfter) || 0,
         discountPercentage: parseFloat(offer.discountPercentage) || 0,
-        branches: offer.branches || [],
+        branches: offer.branches.map(b => parseInt(b, 10)) || [],
         services_ids: offer.services_ids || [],
         doctors_ids: offer.doctors_ids || [],
         imageUrl: offer.image || '',
@@ -238,9 +246,9 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
       formPayload.append('priceBefore', editData.priceBefore.toString());
       formPayload.append('priceAfter', editData.priceAfter.toString());
       formPayload.append('discountPercentage', editData.discountPercentage.toString());
-      formPayload.append('branches', JSON.stringify(editData.branches));
-      formPayload.append('services_ids', JSON.stringify(editData.services_ids));
-      formPayload.append('doctors_ids', JSON.stringify(editData.doctors_ids));
+      formPayload.append('branches', editData.branches.join(','));
+      formPayload.append('services_ids', editData.services_ids.join(','));
+      formPayload.append('doctors_ids', editData.doctors_ids.join(','));
 
       // Handle image updates
       if (editData.imageFile) {
@@ -257,7 +265,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
         priceBefore: editData.priceBefore.toString(),
         priceAfter: editData.priceAfter.toString(),
         discountPercentage: editData.discountPercentage.toString(),
-        branches: editData.branches,
+        branches: editData.branches.map(b => b.toString()),
         services_ids: editData.services_ids,
         doctors_ids: editData.doctors_ids,
         image: editData.imageUrl || offer.image
@@ -303,7 +311,10 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
             <Typography><strong>نسبة الخصم:</strong> {offer.discountPercentage}%</Typography>
             
             <Typography variant="h6">العناصر المرتبطة</Typography>
-            <Typography><strong>الفروع:</strong> {offer.branches.join(', ')}</Typography>
+            <Typography>
+              <strong>الفروع:</strong> {offer.branches.map(branchId => 
+                branches.find(b => b.id === parseInt(branchId))?.name).filter(Boolean).join(', ')}
+            </Typography>
             <Typography>
               <strong>الخدمات:</strong> {offer.services_ids.map(id => 
                 services.find(s => s.id === id)?.name).filter(Boolean).join(', ')}
@@ -441,9 +452,9 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
             <Autocomplete
               multiple
               options={branches}
-              getOptionLabel={(option) => option}
-              value={editData.branches}
-              onChange={(_, value) => handleMultiSelect('branches', value)}
+              getOptionLabel={(option) => option.name}
+              value={branches.filter(b => editData.branches.includes(b.id))}
+              onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -524,7 +535,7 @@ const OfferAddForm = () => {
     imageFile: null
   });
   
-  const [branches, setBranches] = useState<string[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
@@ -539,7 +550,7 @@ const OfferAddForm = () => {
   const [currentOffer, setCurrentOffer] = useState<Offer | null>(null);
   const [dialogMode, setDialogMode] = useState<'view' | 'edit'>('view');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
+  const [offerToDelete, setOfferToDelete] = useState<number | null>(null);
 
   function getAuthHeaders() {
     const token = sessionStorage.getItem('token');
@@ -547,6 +558,29 @@ const OfferAddForm = () => {
       Authorization: token ? `Bearer ${token}` : '',
     };
   }
+
+function parseIdsString(field: any): number[] {
+  if (!field) return [];
+  if (Array.isArray(field)) {
+    // Example: ["3,4"]
+    if (typeof field[0] === "string") {
+      return field[0]
+        .split(",")
+        .map(id => parseInt(id.trim(), 10))
+        .filter(id => !isNaN(id));
+    } else if (typeof field[0] === "number") {
+      return field;
+    }
+  } else if (typeof field === "string") {
+    return field
+      .split(",")
+      .map(id => parseInt(id.trim(), 10))
+      .filter(id => !isNaN(id));
+  } else if (typeof field === "number") {
+    return [field];
+  }
+  return [];
+}
 
   // Fetch initial data
   useEffect(() => {
@@ -557,19 +591,37 @@ const OfferAddForm = () => {
           headers: getAuthHeaders()
         });
         const servicesData = await servicesRes.json();
-        setServices(servicesData);
+        console.log(servicesData);
+        
+        setServices(servicesData.map((service: any) => ({
+          id: service.id,
+          name: service.title,
+          department_id: service.department_id
+        })));
 
         // Fetch all doctors
         const doctorsRes = await fetch('http://localhost:3000/doctors', {
           headers: getAuthHeaders()
         });
         const doctorsData = await doctorsRes.json();
-        setAllDoctors(doctorsData);
         
-        // Extract unique branches from doctors
-        const allBranches = doctorsData.flatMap((doctor: Doctor) => doctor.branches);
-        const uniqueBranches = Array.from(new Set(allBranches)) as string[];
-        setBranches(uniqueBranches);
+        // Transform doctors data to include branches as array
+        const transformedDoctors = doctorsData.map((doctor: any) => ({
+          id: doctor.id,
+          name: doctor.name,
+          branches: parseIdsString(doctor.branches_ids),
+          department_id: doctor.department_id
+        }));
+        setAllDoctors(transformedDoctors);
+        
+        // Fetch branches
+        const branchesRes = await fetch('http://localhost:3000/branches', {
+          headers: getAuthHeaders()
+        });
+        console.log(branchesRes);
+
+        const branchesData = await branchesRes.json();
+        setBranches(branchesData);
 
         // Fetch offers
         await fetchOffers();
@@ -595,7 +647,20 @@ const OfferAddForm = () => {
         headers: getAuthHeaders()
       });
       const data = await response.json();
-      setOffers(data);
+      console.log(data);
+      
+      // Transform offers data to match the expected interface
+      const transformedOffers = data.map((offer: any) => ({
+        ...offer,
+        branches: parseIdsString(offer.branches),
+        services_ids: parseIdsString(offer.services_ids),
+        doctors_ids: parseIdsString(offer.doctors_ids),
+        createdAt: {
+          _seconds: Math.floor(new Date(offer.created_at).getTime() / 1000),
+          _nanoseconds: 0
+        }
+      }));
+      setOffers(transformedOffers);
     } catch (error) {
       console.error('Error fetching offers:', error);
       setNotification({
@@ -613,7 +678,7 @@ const OfferAddForm = () => {
       setFormData(prev => ({ ...prev, doctors_ids: [] }));
     } else {
       const filtered = allDoctors.filter(doctor =>
-        doctor.branches.some(branch => formData.branches.includes(branch))
+        doctor.branches.some(branchId => formData.branches.includes(branchId))
       );
       setFilteredDoctors(filtered);
       // Clear selected doctors if they're not in the filtered list
@@ -728,9 +793,9 @@ const OfferAddForm = () => {
       formPayload.append('priceBefore', formData.priceBefore.toString());
       formPayload.append('priceAfter', formData.priceAfter.toString());
       formPayload.append('discountPercentage', formData.discountPercentage.toString());
-      formPayload.append('branches', JSON.stringify(formData.branches));
-      formPayload.append('services_ids', JSON.stringify(formData.services_ids));
-      formPayload.append('doctors_ids', JSON.stringify(formData.doctors_ids));
+      formPayload.append('branches', formData.branches.join(','));
+      formPayload.append('services_ids', formData.services_ids.join(','));
+      formPayload.append('doctors_ids', formData.doctors_ids.join(','));
 
       if (formData.imageFile) {
         formPayload.append('image', formData.imageFile);
@@ -798,7 +863,7 @@ const OfferAddForm = () => {
     setDialogOpen(true);
   };
 
-  const handleDeleteOffer = (id: string) => {
+  const handleDeleteOffer = (id: number) => {
     setOfferToDelete(id);
     setDeleteConfirmOpen(true);
   };
@@ -836,13 +901,26 @@ const OfferAddForm = () => {
 
   const handleSaveOffer = async (updatedOffer: Offer) => {
     try {
+      const formPayload = new FormData();
+      formPayload.append('title', updatedOffer.title);
+      formPayload.append('description', updatedOffer.description);
+      formPayload.append('priceBefore', updatedOffer.priceBefore);
+      formPayload.append('priceAfter', updatedOffer.priceAfter);
+      formPayload.append('discountPercentage', updatedOffer.discountPercentage);
+      formPayload.append('branches', updatedOffer.branches.join(','));
+      formPayload.append('services_ids', updatedOffer.services_ids.join(','));
+      formPayload.append('doctors_ids', updatedOffer.doctors_ids.join(','));
+
+      if (updatedOffer.image && !updatedOffer.image.startsWith('http')) {
+        // Handle image update if needed
+      }
+
       const response = await fetch(`http://localhost:3000/offers/${updatedOffer.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders()
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
         },
-        body: JSON.stringify(updatedOffer)
+        body: formPayload
       });
 
       if (!response.ok) throw new Error('Failed to update offer');
@@ -909,7 +987,6 @@ const OfferAddForm = () => {
                     <TableCell>السعر بعد الخصم</TableCell>
                     <TableCell>الخصم</TableCell>
                     <TableCell>الفروع</TableCell>
-                    <TableCell>الاطباء</TableCell>
                     <TableCell>تاريخ الإنشاء</TableCell>
                     <TableCell>إجراءات</TableCell>
                   </TableRow>
@@ -936,9 +1013,12 @@ const OfferAddForm = () => {
                         <TableCell>{offer.priceAfter}ر.س</TableCell>
                         <TableCell>{offer.discountPercentage}%</TableCell>
                         <TableCell>
-                          {offer.branches.slice(0, 2).map(branch => (
-                            <Chip key={branch} label={branch} size="small" sx={{ m: 0.5 }} />
-                          ))}
+                          {offer.branches.slice(0, 2).map(branchId => {
+                            const branch = branches.find(b => b.id === parseInt(branchId));
+                            return branch ? (
+                              <Chip key={branch.id} label={branch.name} size="small" sx={{ m: 0.5 }} />
+                            ) : null;
+                          })}
                           {offer.branches.length > 2 && (
                             <Chip label={`+${offer.branches.length - 2}`} size="small" />
                           )}
@@ -1058,67 +1138,68 @@ const OfferAddForm = () => {
               <Divider>
                 <Chip label="معلومات التسعير" />
               </Divider>
-<Box sx={{ display: 'flex', gap: 2 }}>
-  <TextField
-    fullWidth
-    type="number"
-    label="السعر الأصلي"
-    name="priceBefore"
-    value={formData.priceBefore}
-    onChange={handleNumberChange}
-    variant="outlined"
-    InputProps={{
-      endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
-      inputProps: { min: 0, step: 0.01 }
-    }}
-  />
-  
-  <TextField
-    fullWidth
-    type="number"
-    label="السعر بعد الخصم"
-    name="priceAfter"
-    value={formData.priceAfter}
-    onChange={handleNumberChange}
-    variant="outlined"
-    InputProps={{
-      endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
-      inputProps: { min: 0, step: 0.01 }
-    }}
-  />
-  
-  <TextField
-    fullWidth
-    type="number"
-    label="نسبة الخصم"
-    name="discountPercentage"
-    value={formData.discountPercentage}
-    variant="outlined"
-    InputProps={{
-      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-      readOnly: true
-    }}
-  />
-</Box>
+
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="السعر الأصلي"
+                  name="priceBefore"
+                  value={formData.priceBefore}
+                  onChange={handleNumberChange}
+                  variant="outlined"
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
+                    inputProps: { min: 0, step: 0.01 }
+                  }}
+                />
+                
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="السعر بعد الخصم"
+                  name="priceAfter"
+                  value={formData.priceAfter}
+                  onChange={handleNumberChange}
+                  variant="outlined"
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
+                    inputProps: { min: 0, step: 0.01 }
+                  }}
+                />
+                
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="نسبة الخصم"
+                  name="discountPercentage"
+                  value={formData.discountPercentage}
+                  variant="outlined"
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    readOnly: true
+                  }}
+                />
+              </Box>
 
               <Divider>
                 <Chip label="العناصر المرتبطة" />
               </Divider>
 
-              <Autocomplete
-                multiple
-                options={branches}
-                getOptionLabel={(option) => option}
-                value={formData.branches}
-                onChange={(_, value) => handleMultiSelect('branches', value)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="الفروع"
-                    placeholder="اختر الفروع"
-                  />
-                )}
-              />
+        <Autocomplete
+  multiple
+  options={branches}
+  getOptionLabel={(option) => option.name}
+  value={branches.filter(b => formData.branches.includes(b.id))}
+  onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
+  renderInput={(params) => (
+    <TextField
+      {...params}
+      label="الفروع"
+      placeholder="اختر الفروع"
+    />
+  )}
+/>
 
               <Autocomplete
                 multiple

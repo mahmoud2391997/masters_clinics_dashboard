@@ -1,16 +1,20 @@
-export declare const updateDepartment: (_id: string, department: FormData) => Promise<any>;
-export declare const deleteDepartment: (_id: string) => Promise<any>;
-interface Department {
-    _id: string;
+import React from "react";
+interface Branch {
+    id: number;
+    name: string;
+}
+interface DepartmentStat {
+    id: number;
     name: string;
     description: string;
     image?: string;
-    imageUrl?: string;
+    branch_ids?: number[] | string;
 }
-interface CardStatsProps {
-    department: Department;
-    onDeleteSuccess?: () => void;
-    onUpdateSuccess?: () => void;
+interface Props {
+    department: DepartmentStat;
+    branches: Branch[];
+    onUpdateSuccess: () => void;
+    onDeleteSuccess: () => void;
 }
-export default function CardStats({ department, onUpdateSuccess, onDeleteSuccess }: CardStatsProps): import("react/jsx-runtime").JSX.Element;
-export {};
+declare const CardStats: React.FC<Props>;
+export default CardStats;

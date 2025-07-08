@@ -15,13 +15,14 @@ import {
   DialogContent,
   DialogActions,
   Stack,
-  IconButton,
-  Avatar,
+
   TableBody,
-  FormControlLabel,
   Checkbox,
+  MenuItem,
+  LinearProgress,
+  CircularProgress
 } from '@mui/material';
-import { Add, Delete } from '@mui/icons-material';
+import { Add,  Save } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
@@ -47,23 +48,22 @@ interface Doctor {
   skills: string[];
   achievements: string[];
   working_hours: WorkingHoursSlot[];
+  branches_ids: number[];
+  department_id: number;
   image: string | null;
 }
 
-const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+interface Branch {
+  id: number;
+  name: string;
+}
 
-const getDayName = (day: string) => {
-  const dayNames: Record<string, string> = {
-    sunday: 'الأحد',
-    monday: 'الإثنين',
-    tuesday: 'الثلاثاء',
-    wednesday: 'الأربعاء',
-    thursday: 'الخميس',
-    friday: 'الجمعة',
-    saturday: 'السبت',
-  };
-  return dayNames[day] || day;
-};
+interface Department {
+  id: number;
+  name: string;
+}
+
+
 
 const DoctorTable: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -86,27 +86,34 @@ const DoctorTable: React.FC = () => {
     skills: [],
     achievements: [],
     working_hours: [],
+    branches_ids: [],
+    department_id: 0,
     image: null,
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [branchOptions, setBranchOptions] = useState<Branch[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<Department[]>([]);
 
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
         const response = await axios.get<Doctor[]>('http://localhost:3000/doctors', {
           headers: {
-            'Content-Type': 'application/json',
             Authorization: `Bearer ${sessionStorage.getItem('token')}`,
           },
         });
+        console.log('Fetched Doctors:', response.data);
+        
         setDoctors(response.data);
         setFilteredDoctors(response.data);
       } catch (err) {
-        setError('فشل تحميل بيانات الأطباء');
+        setError('فشل في تحميل بيانات الأطباء');
         console.error(err);
       } finally {
         setLoading(false);
@@ -116,83 +123,65 @@ const DoctorTable: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    let filtered = [...doctors];
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (d) =>
-          d.name.toLowerCase().includes(query) ||
-          (d.title && d.title.toLowerCase().includes(query)) ||
-          (d.practice_area && d.practice_area.toLowerCase().includes(query))
-      );
-    }
+    const fetchOptions = async () => {
+      try {
+        const [branchesRes, departmentsRes] = await Promise.all([
+          axios.get<Branch[]>('http://localhost:3000/branches', {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
+          }),
+          axios.get<Department[]>('http://localhost:3000/departments', {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
+          }),
+        ]);
+        setBranchOptions(branchesRes.data);
+        setDepartmentOptions(departmentsRes.data);
+      } catch (err) {
+        console.error('فشل في تحميل الفروع أو الأقسام', err);
+      }
+    };
+    fetchOptions();
+  }, []);
+
+  useEffect(() => {
+    const filtered = doctors.filter(doctor =>
+      doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (doctor.title && doctor.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (doctor.practice_area && doctor.practice_area.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
     setFilteredDoctors(filtered);
   }, [searchQuery, doctors]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewDoctor((prev) => ({ ...prev, [name]: value }));
+    setNewDoctor(prev => ({ ...prev, [name]: value }));
   };
 
   const handleListChange = (name: keyof Doctor, value: string) => {
-    setNewDoctor((prev) => ({ ...prev, [name]: value.split(',').map((item) => item.trim()) }));
+    setNewDoctor(prev => ({ ...prev, [name]: value.split(',').map(item => item.trim()) }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
-      setImageUrl('');
+      const file = e.target.files[0];
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setImageUrl(e.target.value);
-    setImageFile(null);
-  };
-
-  const addWorkingHoursSlot = () => {
-    setNewDoctor((prev) => ({
-      ...prev,
-      working_hours: [
-        ...(prev.working_hours || []).map((slot) => ({ ...slot, days: [...slot.days] })),
-        { days: [], openingTime: '', closingTime: '' },
-      ],
-    }));
-  };
-
-  const removeWorkingHoursSlot = (index: number) => {
-    setNewDoctor((prev) => {
-      const updated = [...(prev.working_hours || []).map((slot) => ({ ...slot, days: [...slot.days] }))];
-      updated.splice(index, 1);
-      return { ...prev, working_hours: updated };
-    });
-  };
-
-  const handleDayToggle = (slotIndex: number, day: string) => {
-    setNewDoctor((prev) => {
-      const slots = (prev.working_hours || []).map((slot) => ({ ...slot, days: [...slot.days] }));
-      const currentDays = slots[slotIndex].days;
-      if (currentDays.includes(day)) {
-        slots[slotIndex].days = currentDays.filter((d) => d !== day);
-      } else {
-        slots[slotIndex].days = [...currentDays, day];
-      }
-      return { ...prev, working_hours: slots };
-    });
-  };
-
-  const handleWorkingHoursChange = (slotIndex: number, field: string, value: string) => {
-    setNewDoctor((prev) => {
-      const slots = (prev.working_hours || []).map((slot) => ({ ...slot, days: [...slot.days] }));
-      slots[slotIndex] = { ...slots[slotIndex], [field]: value };
-      return { ...prev, working_hours: slots };
-    });
-  };
-
   const handleSubmit = async () => {
+    if (!newDoctor.name) {
+      setError('الاسم مطلوب');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('name', newDoctor.name || '');
+      formData.append('name', newDoctor.name);
       formData.append('title', newDoctor.title || '');
       formData.append('description', newDoctor.description || '');
       formData.append('position', newDoctor.position || '');
@@ -206,47 +195,69 @@ const DoctorTable: React.FC = () => {
       formData.append('skills', JSON.stringify(newDoctor.skills || []));
       formData.append('achievements', JSON.stringify(newDoctor.achievements || []));
       formData.append('working_hours', JSON.stringify(newDoctor.working_hours || []));
+      formData.append('branches_ids', JSON.stringify(newDoctor.branches_ids || []));
+      formData.append('department_id', newDoctor.department_id?.toString() || '');
 
       if (imageFile) {
         formData.append('image', imageFile);
-      } else if (imageUrl) {
-        formData.append('imageUrl', imageUrl);
       }
 
       const response = await axios.post('http://localhost:3000/doctors', formData, {
         headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('token')}`,
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data',
         },
       });
 
-      setDoctors((prev) => [...prev, response.data]);
-      setFilteredDoctors((prev) => [...prev, response.data]);
+      setDoctors(prev => [...prev, response.data]);
+      setFilteredDoctors(prev => [...prev, response.data]);
       setOpenAddDialog(false);
-
-      // Reset
-      setNewDoctor({
-        name: '',
-        title: '',
-        description: '',
-        position: '',
-        practice_area: '',
-        experience: '',
-        address: '',
-        phone: '',
-        email: '',
-        personal_experience: '',
-        education: [],
-        skills: [],
-        achievements: [],
-        working_hours: [],
-        image: null,
-      });
-      setImageFile(null);
-      setImageUrl('');
+      resetForm();
     } catch (err) {
       setError('فشل في إضافة الطبيب');
       console.error(err);
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setNewDoctor({
+      name: '',
+      title: '',
+      description: '',
+      position: '',
+      practice_area: '',
+      experience: '',
+      address: '',
+      phone: '',
+      email: '',
+      personal_experience: '',
+      education: [],
+      skills: [],
+      achievements: [],
+      working_hours: [],
+      branches_ids: [],
+      department_id: 0,
+      image: null,
+    });
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  const getBranchName = (id: number) => {
+    const branch = branchOptions.find(b => b.id === id);
+    return branch ? branch.name : id.toString();
+  };
+
+  const getDepartmentName = (id: number) => {
+
+    console.log('Department ID:', id);
+    
+    console.log(departmentOptions);
+    
+    const dept = departmentOptions.find(d => d.id === id);
+    return dept ? dept.name : '-';
   };
 
   return (
@@ -254,15 +265,25 @@ const DoctorTable: React.FC = () => {
       <Box display="flex" gap={2} mb={2}>
         <TextField
           fullWidth
-          label="بحث بالاسم أو اللقب أو المجال"
+          label="بحث بالاسم أو اللقب أو التخصص"
           variant="outlined"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <Button variant="contained" startIcon={<Add />} onClick={() => setOpenAddDialog(true)}>
+        <Button 
+          variant="contained" 
+          startIcon={<Add />} 
+          onClick={() => setOpenAddDialog(true)}
+        >
           إضافة طبيب
         </Button>
       </Box>
+
+      {error && (
+        <Box mb={2}>
+          <Typography color="error">{error}</Typography>
+        </Box>
+      )}
 
       <TableContainer component={Paper}>
         <Table>
@@ -271,21 +292,18 @@ const DoctorTable: React.FC = () => {
               <TableCell align="center">الاسم</TableCell>
               <TableCell align="center">اللقب</TableCell>
               <TableCell align="center">المنصب</TableCell>
-              <TableCell align="center">المجال</TableCell>
+              <TableCell align="center">التخصص</TableCell>
+              <TableCell align="center">القسم</TableCell>
               <TableCell align="center">الهاتف</TableCell>
-              <TableCell align="center">البريد</TableCell>
+              <TableCell align="center">البريد الإلكتروني</TableCell>
               <TableCell align="center">الإجراءات</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">جاري التحميل...</TableCell>
-              </TableRow>
-            ) : error ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <Typography color="error">{error}</Typography>
+                <TableCell colSpan={8} align="center">
+                  <LinearProgress />
                 </TableCell>
               </TableRow>
             ) : filteredDoctors.length > 0 ? (
@@ -295,95 +313,247 @@ const DoctorTable: React.FC = () => {
                   <TableCell align="center">{doctor.title || '-'}</TableCell>
                   <TableCell align="center">{doctor.position || '-'}</TableCell>
                   <TableCell align="center">{doctor.practice_area || '-'}</TableCell>
+                  <TableCell align="center">{getDepartmentName(doctor.department_id)}</TableCell>
                   <TableCell align="center">{doctor.phone || '-'}</TableCell>
                   <TableCell align="center">{doctor.email || '-'}</TableCell>
                   <TableCell align="center">
                     <Link to={`/doctors/${doctor.id}`}>
-                      <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition">عرض</button>
+                      <Button variant="outlined" size="small">عرض</Button>
                     </Link>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center">لا يوجد بيانات</TableCell>
+                <TableCell colSpan={8} align="center">لا توجد بيانات</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)} fullWidth maxWidth="md">
-        <DialogTitle>إضافة طبيب جديد</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField label="الاسم" name="name" value={newDoctor.name} onChange={handleInputChange} required />
-            <TextField label="اللقب" name="title" value={newDoctor.title} onChange={handleInputChange} />
-            <TextField label="الوصف" name="description" value={newDoctor.description} onChange={handleInputChange} />
-            <TextField label="المنصب" name="position" value={newDoctor.position} onChange={handleInputChange} />
-            <TextField label="المجال" name="practice_area" value={newDoctor.practice_area} onChange={handleInputChange} />
-            <TextField label="الخبرة" name="experience" value={newDoctor.experience} onChange={handleInputChange} />
-            <TextField label="العنوان" name="address" value={newDoctor.address} onChange={handleInputChange} />
-            <TextField label="الهاتف" name="phone" value={newDoctor.phone} onChange={handleInputChange} />
-            <TextField label="البريد الإلكتروني" name="email" value={newDoctor.email} onChange={handleInputChange} />
-            <TextField label="الخبرات الشخصية" name="personal_experience" value={newDoctor.personal_experience} onChange={handleInputChange} />
-            <TextField label="التعليم (افصل بفواصل)" value={newDoctor.education?.join(', ') || ''} onChange={(e) => handleListChange('education', e.target.value)} />
-            <TextField label="المهارات (افصل بفواصل)" value={newDoctor.skills?.join(', ') || ''} onChange={(e) => handleListChange('skills', e.target.value)} />
-            <TextField label="الإنجازات (افصل بفواصل)" value={newDoctor.achievements?.join(', ') || ''} onChange={(e) => handleListChange('achievements', e.target.value)} />
+  <Dialog 
+  open={openAddDialog} 
+  onClose={() => {
+    setOpenAddDialog(false);
+    resetForm();
+  }} 
+  fullWidth 
+  maxWidth="md"
+>
+  <DialogTitle>إضافة طبيب جديد</DialogTitle>
+  <DialogContent dividers>
+    <Stack spacing={3} sx={{ pt: 2 }}>
+      <TextField
+        label="الاسم *"
+        name="name"
+        value={newDoctor.name}
+        onChange={handleInputChange}
+        fullWidth
+      />
 
-            <Box>
-              <Typography variant="subtitle2">مواعيد العمل</Typography>
-              <Button onClick={addWorkingHoursSlot} startIcon={<Add />} sx={{ mt: 1, mb: 2 }}>
-                إضافة فترة عمل
-              </Button>
-              <Stack spacing={2}>
-                {(newDoctor.working_hours || []).map((slot, index) => (
-                  <Paper key={index} sx={{ p: 2 }}>
-                    <Typography>الأيام</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {daysOfWeek.map((day) => (
-                        <FormControlLabel
-                          key={day}
-                          control={<Checkbox checked={slot.days.includes(day)} onChange={() => handleDayToggle(index, day)} />}
-                          label={getDayName(day)}
-                        />
-                      ))}
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                      <TextField label="وقت الفتح" type="time" value={slot.openingTime} onChange={(e) => handleWorkingHoursChange(index, 'openingTime', e.target.value)} fullWidth />
-                      <TextField label="وقت الإغلاق" type="time" value={slot.closingTime} onChange={(e) => handleWorkingHoursChange(index, 'closingTime', e.target.value)} fullWidth />
-                    </Box>
-                    <IconButton onClick={() => removeWorkingHoursSlot(index)} color="error" sx={{ mt: 1 }}>
-                      <Delete />
-                    </IconButton>
-                  </Paper>
-                ))}
-              </Stack>
-            </Box>
+      <TextField
+        label="اللقب"
+        name="title"
+        value={newDoctor.title}
+        onChange={handleInputChange}
+        fullWidth
+      />
 
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>صورة الطبيب</Typography>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Button variant="outlined" component="label">
-                  اختر صورة
-                  <input type="file" hidden accept="image/*" onChange={handleFileChange} />
-                </Button>
-                {imageFile && <Typography>{imageFile.name}</Typography>}
-              </Stack>
-              <Typography variant="body2" sx={{ mt: 1 }}>أو</Typography>
-              <TextField fullWidth label="رابط الصورة" value={imageUrl} onChange={handleImageUrlChange} sx={{ mt: 1 }} />
-              {(imageFile || imageUrl) && (
-                <Avatar src={imageFile ? URL.createObjectURL(imageFile) : imageUrl} sx={{ width: 100, height: 100, mt: 2 }} />
-              )}
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAddDialog(false)}>إلغاء</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary" disabled={!newDoctor.name}>حفظ</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      <TextField
+        label="الوصف"
+        name="description"
+        value={newDoctor.description}
+        onChange={handleInputChange}
+        multiline
+        rows={3}
+        fullWidth
+      />
+
+      <TextField
+        label="المنصب"
+        name="position"
+        value={newDoctor.position}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="التخصص"
+        name="practice_area"
+        value={newDoctor.practice_area}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="الخبرة"
+        name="experience"
+        value={newDoctor.experience}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="العنوان"
+        name="address"
+        value={newDoctor.address}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="الهاتف"
+        name="phone"
+        value={newDoctor.phone}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="البريد الإلكتروني"
+        name="email"
+        value={newDoctor.email}
+        onChange={handleInputChange}
+        fullWidth
+      />
+
+      <TextField
+        label="الخبرة الشخصية"
+        name="personal_experience"
+        value={newDoctor.personal_experience}
+        onChange={handleInputChange}
+        multiline
+        rows={3}
+        fullWidth
+      />
+
+      <TextField
+        label="التعليم (مفصولة بفاصلة)"
+        value={newDoctor.education?.join(', ') || ''}
+        onChange={(e) => handleListChange('education', e.target.value)}
+        fullWidth
+      />
+
+      <TextField
+        label="المهارات (مفصولة بفاصلة)"
+        value={newDoctor.skills?.join(', ') || ''}
+        onChange={(e) => handleListChange('skills', e.target.value)}
+        fullWidth
+      />
+
+      <TextField
+        label="الإنجازات (مفصولة بفاصلة)"
+        value={newDoctor.achievements?.join(', ') || ''}
+        onChange={(e) => handleListChange('achievements', e.target.value)}
+        fullWidth
+      />
+
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          الفروع
+        </Typography>
+        <TextField
+          select
+          SelectProps={{
+            multiple: true,
+            value: newDoctor.branches_ids || [],
+            onChange: (e) => {
+              const value = e.target.value as number[];
+              setNewDoctor(prev => ({ ...prev, branches_ids: value }));
+            },
+            renderValue: (selected) => {
+              const selectedBranches = selected as number[];
+              return selectedBranches.map(id => getBranchName(id)).join(', ');
+            },
+          }}
+          fullWidth
+        >
+          {branchOptions.map((branch) => (
+            <MenuItem key={branch.id} value={branch.id}>
+              <Checkbox checked={newDoctor.branches_ids?.includes(branch.id) || false} />
+              {branch.name}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          القسم
+        </Typography>
+        <TextField
+          select
+          value={newDoctor.department_id || ''}
+          onChange={(e) => setNewDoctor(prev => ({
+            ...prev,
+            department_id: parseInt(e.target.value as string)
+          }))}
+          fullWidth
+        >
+          {departmentOptions.map((dept) => (
+            <MenuItem key={dept.id} value={dept.id}>
+              {dept.name}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          صورة الملف الشخصي
+        </Typography>
+        <Button
+          variant="outlined"
+          component="label"
+          fullWidth
+        >
+          تحميل صورة
+          <input
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={handleFileChange}
+          />
+        </Button>
+        {imagePreview && (
+          <Box mt={2} textAlign="center">
+            <img
+              src={imagePreview}
+              alt="Preview"
+              style={{
+                maxHeight: '200px',
+                maxWidth: '100%',
+                borderRadius: '4px'
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+    </Stack>
+  </DialogContent>
+  <DialogActions>
+    <Button 
+      onClick={() => {
+        setOpenAddDialog(false);
+        resetForm();
+      }}
+      color="secondary"
+    >
+      إلغاء
+    </Button>
+    <Button
+      onClick={handleSubmit}
+      variant="contained"
+      color="primary"
+      disabled={submitting || !newDoctor.name}
+      startIcon={submitting ? <CircularProgress size={20} /> : <Save />}
+    >
+      {submitting ? 'جاري الحفظ...' : 'حفظ'}
+    </Button>
+  </DialogActions>
+</Dialog>
+   </Box>
   );
 };
 

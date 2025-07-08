@@ -1,8 +1,10 @@
 import React from "react";
 interface Doctor {
+    id: string;
     name: string;
 }
 interface Branch {
+    id: string;
     name: string;
 }
 interface Category {
@@ -12,6 +14,9 @@ interface Category {
     imageUrl: string;
     doctors?: Doctor[];
     branches?: Branch[];
+    capabilities?: string[];
+    approach?: string;
+    department?: string;
 }
 interface ServiceCardProps {
     category: Category;
