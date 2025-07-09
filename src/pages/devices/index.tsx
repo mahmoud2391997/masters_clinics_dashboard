@@ -14,12 +14,18 @@ import {
   message,
   Image,
   ConfigProvider,
+  TimePicker,
+  Checkbox,
+  Card,
+  Row,
+  Col
 } from "antd"
-import { UploadOutlined, DeleteOutlined } from "@ant-design/icons"
+import { UploadOutlined, DeleteOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons"
 import { getBranches } from "../../api/regions&branches"
 import { fetchDepartments } from "../../api/departments"
 import arabic from "antd/lib/locale/ar_EG"
 import { addDevice, deleteDevice, getDevices, updateDevice } from "../../api/devices"
+import dayjs from "dayjs"
 
 const { Option } = Select
 const { TextArea } = Input
@@ -53,6 +59,26 @@ const arabicText = {
   medicalDevices: "الأجهزة الطبية",
   cancel: "إلغاء",
   ok: "موافق",
+  day: "اليوم",
+  startTime: "وقت البدء",
+  endTime: "وقت الانتهاء",
+  active: "نشط",
+  addTimeSlot: "إضافة موعد عمل",
+  workingHours: "ساعات العمل",
+  saturday: "السبت",
+  sunday: "الأحد",
+  monday: "الإثنين",
+  tuesday: "الثلاثاء",
+  wednesday: "الأربعاء",
+  thursday: "الخميس",
+  friday: "الجمعة"
+}
+
+interface WorkingTimeSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
 }
 
 interface Branch {
@@ -66,8 +92,7 @@ interface Branch {
 }
 
 interface Department {
-  _id: string
-  id: number
+  id: string
   name: string
   description?: string
   imageUrl?: string
@@ -75,12 +100,11 @@ interface Department {
 
 interface Device {
   id: string
-  _id: string
   name: string
   description?: string
   department_id: number[]
   branches: number[]
-  working_time_slots: any[]
+  working_time_slots: WorkingTimeSlot[]
   sessionPeriod: string
   imageUrl?: string
   image?: string
@@ -108,9 +132,23 @@ const MedicalDevicesPage: React.FC = () => {
           getBranches(),
           fetchDepartments(),
         ])
-        setDevices(devicesData)
+        console.log(devicesData);
+        
+        setDevices(devicesData.map(device => ({
+          ...device,
+          working_time_slots: device.working_time_slots.map(slot => ({
+            ...slot,
+            startTime: slot.startTime || '',
+            endTime: slot.endTime || '',
+            isActive: true
+          }))
+        })))
         setBranches(branchesData.data)
-        setDepartments(departmentsData)
+
+        setDepartments(departmentsData.map(dept => ({
+          ...dept,
+          id: dept.id.toString()
+        })))
         setLoading(false)
       } catch (error) {
         message.error(arabicText.operationFailed)
@@ -164,6 +202,11 @@ const MedicalDevicesPage: React.FC = () => {
       department_id: device.department_id,
       branches: device.branches,
       sessionPeriod: device.sessionPeriod,
+      working_time_slots: device.working_time_slots?.map(slot => ({
+        ...slot,
+        startTime: slot.startTime ? dayjs(slot.startTime, 'HH:mm') : null,
+        endTime: slot.endTime ? dayjs(slot.endTime, 'HH:mm') : null
+      })) || []
     })
     setImagePreview(device.image || "")
     setIsModalVisible(true)
@@ -179,7 +222,7 @@ const MedicalDevicesPage: React.FC = () => {
     try {
       setLoading(true)
       await deleteDevice(deviceToDelete)
-      setDevices(devices.filter((device) => device._id !== deviceToDelete))
+      setDevices(devices.filter((device) => device.id !== deviceToDelete))
       message.success(arabicText.deviceDeleted)
     } catch (error) {
       message.error(arabicText.operationFailed)
@@ -189,42 +232,55 @@ const MedicalDevicesPage: React.FC = () => {
     }
   }
 
-  const handleOk = async () => {
-    try {
-      setLoading(true)
-      const values = await form.validateFields()
+const handleOk = async () => {
+  try {
+    setLoading(true);
+    const values = await form.validateFields();
 
-      const formData = new FormData()
-      formData.append("name", values.name)
-      formData.append("description", values.description || "")
-      formData.append("sessionPeriod", values.sessionPeriod)
-      formData.append("department_id", JSON.stringify(values.department_id))
-      formData.append("branches", JSON.stringify(values.branches))
+    const formData = new FormData();
+    formData.append("name", values.name);
+    formData.append("description", values.description || "");
+    formData.append("sessionPeriod", values.sessionPeriod);
+    formData.append("department_id", JSON.stringify(values.department_id));
+    formData.append("branches", JSON.stringify(values.branches));
 
-      if (values.imageFile) {
-        formData.append("image", values.imageFile)
-      } else if (editingDevice?.image && !values.imageFile) {
-        formData.append("keepExistingImage", "true")
-      }
-
-      if (editingDevice) {
-        const updatedDevice = await updateDevice(editingDevice._id, formData)
-        setDevices(devices.map((device) => (device._id === editingDevice._id ? updatedDevice : device)))
-        message.success(arabicText.deviceUpdated)
-      } else {
-        const newDevice = await addDevice(formData)
-        setDevices([...devices, newDevice])
-        message.success(arabicText.deviceAdded)
-      }
-
-      setIsModalVisible(false)
-    } catch (error) {
-      console.error("Error:", error)
-      message.error(arabicText.operationFailed)
-    } finally {
-      setLoading(false)
+    if (values.working_time_slots) {
+      const processedSlots = values.working_time_slots.map((slot: { day: string; startTime: any; endTime: any; isActive?: boolean }) => ({
+        day: slot.day,
+        startTime: slot.startTime ? slot.startTime.format('HH:mm') : '',
+        endTime: slot.endTime ? slot.endTime.format('HH:mm') : '',
+        isActive: slot.isActive !== false,
+      }));
+      formData.append("working_time_slots", JSON.stringify(processedSlots));
     }
+
+    // ✅ Fix: Always use fileList, not form value
+    if (fileList.length > 0 && fileList[0].originFileObj) {
+      formData.append("image", fileList[0].originFileObj);
+    } else if (editingDevice?.image) {
+      formData.append("keepExistingImage", "true");
+    }
+
+    let device: Device;
+    if (editingDevice) {
+      device = await updateDevice(editingDevice.id, formData);
+      setDevices(devices.map((d) => (d.id === editingDevice.id ? device : d)));
+      message.success(arabicText.deviceUpdated);
+    } else {
+      device = await addDevice(formData);
+      setDevices([...devices, device]);
+      message.success(arabicText.deviceAdded);
+    }
+
+    setIsModalVisible(false);
+  } catch (error) {
+    console.error("Error:", error);
+    message.error(arabicText.operationFailed);
+  } finally {
+    setLoading(false);
   }
+};
+
 
   const columns = [
     {
@@ -251,7 +307,7 @@ const MedicalDevicesPage: React.FC = () => {
       key: "departments",
       render: (departmentIds: number[]) =>
         departmentIds && departmentIds.length ? (
-          <span>{departmentIds.map((id) => departments.find((d) => d.id === id)?.name || id).join(", ")}</span>
+          <span>{departmentIds.map((id) => departments.find((d) => d.id.toString() === id.toString())?.name || id).join(", ")}</span>
         ) : (
           "-"
         ),
@@ -278,7 +334,21 @@ const MedicalDevicesPage: React.FC = () => {
       title: arabicText.sessionPeriod,
       dataIndex: "sessionPeriod",
       key: "sessionPeriod",
-      render: (period: string) => `${period} دقيقة`,
+      render: (period: string) => `${period} ${arabicText.sessionPeriod}`,
+    },
+    {
+      title: arabicText.workingHours,
+      dataIndex: "working_time_slots",
+      key: "working_time_slots",
+      render: (slots: WorkingTimeSlot[]) => (
+        <div>
+          {slots?.map((slot, index) => (
+            <div key={index}>
+              {arabicText[slot.day as keyof typeof arabicText] || slot.day}: {slot.startTime} - {slot.endTime} {slot.isActive ? `(${arabicText.active})` : ""}
+            </div>
+          ))}
+        </div>
+      ),
     },
     {
       title: arabicText.actions,
@@ -288,9 +358,9 @@ const MedicalDevicesPage: React.FC = () => {
           <Button onClick={() => handleEdit(record)}>{arabicText.edit}</Button>
           <Button
             danger
-            onClick={() => handleDelete(record._id)}
+            onClick={() => handleDelete(record.id)}
             icon={<DeleteOutlined />}
-            loading={loading && deviceToDelete === record._id}
+            loading={loading && deviceToDelete === record.id}
           >
             {arabicText.delete}
           </Button>
@@ -334,13 +404,26 @@ const MedicalDevicesPage: React.FC = () => {
             layout="vertical"
             initialValues={{}}
           >
-            <Form.Item
-              label={arabicText.deviceName}
-              name="name"
-              rules={[{ required: true, message: arabicText.deviceNameRequired }]}
-            >
-              <Input />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={arabicText.deviceName}
+                  name="name"
+                  rules={[{ required: true, message: arabicText.deviceNameRequired }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label={arabicText.sessionPeriod}
+                  name="sessionPeriod"
+                  rules={[{ required: true, message: arabicText.sessionPeriodRequired }]}
+                >
+                  <Input type="number" addonAfter="دقيقة" />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item
               label={arabicText.description}
@@ -350,41 +433,94 @@ const MedicalDevicesPage: React.FC = () => {
               <TextArea rows={3} />
             </Form.Item>
 
-            <Form.Item
-              label={arabicText.departments}
-              name="department_id"
-              rules={[{ required: true, message: arabicText.departmentsRequired }]}
-            >
-              <Select mode="multiple" placeholder={arabicText.departments}>
-                {departments.map((dep) => (
-                  <Option key={dep.id} value={dep.id}>
-                    {dep.name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={arabicText.departments}
+                  name="department_id"
+                  rules={[{ required: true, message: arabicText.departmentsRequired }]}
+                >
+                  <Select mode="multiple" placeholder={arabicText.departments}>
+                    {departments.map((dep) => (
+                      <Option key={dep.id} value={dep.id}>
+                        {dep.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label={arabicText.branches}
+                  name="branches"
+                  rules={[{ required: true, message: arabicText.branchesRequired }]}
+                >
+                  <Select mode="multiple" placeholder={arabicText.branches}>
+                    {branches.map((branch) => (
+                      <Option key={branch.id} value={parseInt(branch.id)}>
+                        {branch.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
 
-            <Form.Item
-              label={arabicText.branches}
-              name="branches"
-              rules={[{ required: true, message: arabicText.branchesRequired }]}
-            >
-              <Select mode="multiple" placeholder={arabicText.branches}>
-                {branches.map((branch) => (
-                  <Option key={branch.id} value={parseInt(branch.id)}>
-                    {branch.name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              label={arabicText.sessionPeriod}
-              name="sessionPeriod"
-              rules={[{ required: true, message: arabicText.sessionPeriodRequired }]}
-            >
-              <Input type="number" />
-            </Form.Item>
+            <Card title={arabicText.workingTimeSlots} style={{ marginBottom: 16 }}>
+              <Form.List name="working_time_slots">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map(({ key, name, ...restField }) => (
+                      <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'day']}
+                          rules={[{ required: true, message: 'اختر اليوم' }]}
+                        >
+                          <Select placeholder={arabicText.day} style={{ width: 120 }}>
+                            <Option value="saturday">{arabicText.saturday}</Option>
+                            <Option value="sunday">{arabicText.sunday}</Option>
+                            <Option value="monday">{arabicText.monday}</Option>
+                            <Option value="tuesday">{arabicText.tuesday}</Option>
+                            <Option value="wednesday">{arabicText.wednesday}</Option>
+                            <Option value="thursday">{arabicText.thursday}</Option>
+                            <Option value="friday">{arabicText.friday}</Option>
+                          </Select>
+                        </Form.Item>
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'startTime']}
+                          rules={[{ required: true, message: arabicText.startTime }]}
+                        >
+                          <TimePicker format="HH:mm" placeholder={arabicText.startTime} />
+                        </Form.Item>
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'endTime']}
+                          rules={[{ required: true, message: arabicText.endTime }]}
+                        >
+                          <TimePicker format="HH:mm" placeholder={arabicText.endTime} />
+                        </Form.Item>
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'isActive']}
+                          valuePropName="checked"
+                          initialValue={true}
+                        >
+                          <Checkbox>{arabicText.active}</Checkbox>
+                        </Form.Item>
+                        <MinusCircleOutlined onClick={() => remove(name)} />
+                      </Space>
+                    ))}
+                    <Form.Item>
+                      <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                        {arabicText.addTimeSlot}
+                      </Button>
+                    </Form.Item>
+                  </>
+                )}
+              </Form.List>
+            </Card>
 
             <Form.Item label={arabicText.uploadImage}>
               <Upload

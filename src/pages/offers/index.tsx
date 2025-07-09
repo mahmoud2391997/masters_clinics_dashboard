@@ -22,7 +22,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Avatar,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -99,6 +98,10 @@ interface OfferDialogProps {
   services: Service[];
   branches: Branch[];
   doctors: Doctor[];
+  editData: OfferFormData;
+  setEditData: React.Dispatch<React.SetStateAction<OfferFormData>>;
+  imagePreview: string | null;
+  setImagePreview: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const OfferDialog: React.FC<OfferDialogProps> = ({
@@ -109,30 +112,19 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
   onSave,
   services,
   branches,
-  doctors: allDoctors
+  doctors: allDoctors,
+  editData,
+  setEditData,
+  imagePreview,
+  setImagePreview
 }) => {
-  const [editData, setEditData] = useState<OfferFormData>({
-    title: '',
-    description: '',
-    priceBefore: 0,
-    priceAfter: 0,
-    discountPercentage: 0,
-    branches: [],
-    services_ids: [],
-    doctors_ids: [],
-    imageUrl: '',
-    imageFile: null
-  });
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Calculate discount percentage
-const calculateDiscount = (before: number, after: number) => {
-  return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
-};
+  const calculateDiscount = (before: number, after: number) => {
+    return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
+  };
 
-  // Filter doctors based on selected branches
   useEffect(() => {
     if (editData.branches.length === 0) {
       setFilteredDoctors([]);
@@ -143,26 +135,6 @@ const calculateDiscount = (before: number, after: number) => {
       setFilteredDoctors(filtered);
     }
   }, [editData.branches, allDoctors]);
-
-  // Initialize form data when offer changes
-  useEffect(() => {
-    if (offer) {
-      const initialData: OfferFormData = {
-        title: offer.title || '',
-        description: offer.description || '',
-        priceBefore: parseFloat(offer.priceBefore) || 0,
-        priceAfter: parseFloat(offer.priceAfter) || 0,
-        discountPercentage: parseFloat(offer.discountPercentage) || 0,
-        branches: offer.branches.map(b => parseInt(b, 10)) || [],
-        services_ids: offer.services_ids || [],
-        doctors_ids: offer.doctors_ids || [],
-        imageUrl: offer.image || '',
-        imageFile: null
-      };
-      setEditData(initialData);
-      setImagePreview(offer.image || null);
-    }
-  }, [offer]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -180,6 +152,10 @@ const calculateDiscount = (before: number, after: number) => {
         return;
       }
 
+      if (file.size > 5 * 1024 * 1024) {
+        return;
+      }
+
       setEditData(prev => ({
         ...prev,
         imageFile: file,
@@ -193,6 +169,18 @@ const calculateDiscount = (before: number, after: number) => {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImageSelection = () => {
+    setEditData(prev => ({
+      ...prev,
+      imageFile: null,
+      imageUrl: ''
+    }));
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -221,7 +209,6 @@ const calculateDiscount = (before: number, after: number) => {
       const newData = {...prev};
       if (type === 'branches') {
         newData.branches = values;
-        // Reset doctors when branches change
         newData.doctors_ids = values.length === 0 ? [] : 
           prev.doctors_ids.filter(id => 
             filteredDoctors.some(d => d.id === id)
@@ -239,25 +226,6 @@ const calculateDiscount = (before: number, after: number) => {
     if (!offer || !onSave) return;
 
     try {
-      // Create FormData for the update
-      const formPayload = new FormData();
-      formPayload.append('title', editData.title);
-      formPayload.append('description', editData.description);
-      formPayload.append('priceBefore', editData.priceBefore.toString());
-      formPayload.append('priceAfter', editData.priceAfter.toString());
-      formPayload.append('discountPercentage', editData.discountPercentage.toString());
-      formPayload.append('branches', editData.branches.join(','));
-      formPayload.append('services_ids', editData.services_ids.join(','));
-      formPayload.append('doctors_ids', editData.doctors_ids.join(','));
-
-      // Handle image updates
-      if (editData.imageFile) {
-        formPayload.append('image', editData.imageFile);
-      } else if (editData.imageUrl) {
-        formPayload.append('imageUrl', editData.imageUrl);
-      }
-
-      // Call the onSave callback with updated data
       const updatedOffer: Offer = {
         ...offer,
         title: editData.title,
@@ -327,11 +295,13 @@ const calculateDiscount = (before: number, after: number) => {
             {offer.image && (
               <>
                 <Typography variant="h6">صورة العرض</Typography>
-                <Avatar 
-                  src={offer.image} 
-                  variant="rounded"
-                  sx={{ width: 200, height: 200 }}
-                />
+                <Box display="flex" justifyContent="center">
+                  <img 
+                    src={offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`}
+                    alt={offer.title}
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                  />
+                </Box>
               </>
             )}
           </Stack>
@@ -405,11 +375,16 @@ const calculateDiscount = (before: number, after: number) => {
               <Typography variant="subtitle1" gutterBottom>صورة العرض</Typography>
               <Box display="flex" alignItems="center" gap={2}>
                 {imagePreview && (
-                  <Avatar 
-                    src={imagePreview} 
-                    variant="rounded"
-                    sx={{ width: 100, height: 100 }}
-                  />
+                  <>
+                    <img 
+                      src={imagePreview}
+                      alt="Preview"
+                      style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: '4px' }}
+                    />
+                    <IconButton onClick={clearImageSelection} color="error">
+                      <CloseIcon />
+                    </IconButton>
+                  </>
                 )}
                 <TextField
                   fullWidth
@@ -535,6 +510,19 @@ const OfferAddForm = () => {
     imageFile: null
   });
   
+  const [editData, setEditData] = useState<OfferFormData>({
+    title: '',
+    description: '',
+    priceBefore: 0,
+    priceAfter: 0,
+    discountPercentage: 0,
+    branches: [],
+    services_ids: [],
+    doctors_ids: [],
+    imageUrl: '',
+    imageFile: null
+  });
+  
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
@@ -555,297 +543,9 @@ const OfferAddForm = () => {
   function getAuthHeaders() {
     const token = sessionStorage.getItem('token');
     return {
-      Authorization: token ? `Bearer ${token}` : '',
+      'Authorization': token ? `Bearer ${token}` : '',
     };
   }
-
-function parseIdsString(field: any): number[] {
-  if (!field) return [];
-  if (Array.isArray(field)) {
-    // Example: ["3,4"]
-    if (typeof field[0] === "string") {
-      return field[0]
-        .split(",")
-        .map(id => parseInt(id.trim(), 10))
-        .filter(id => !isNaN(id));
-    } else if (typeof field[0] === "number") {
-      return field;
-    }
-  } else if (typeof field === "string") {
-    return field
-      .split(",")
-      .map(id => parseInt(id.trim(), 10))
-      .filter(id => !isNaN(id));
-  } else if (typeof field === "number") {
-    return [field];
-  }
-  return [];
-}
-
-  // Fetch initial data
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        // Fetch services
-        const servicesRes = await fetch('http://localhost:3000/services', {
-          headers: getAuthHeaders()
-        });
-        const servicesData = await servicesRes.json();
-        console.log(servicesData);
-        
-        setServices(servicesData.map((service: any) => ({
-          id: service.id,
-          name: service.title,
-          department_id: service.department_id
-        })));
-
-        // Fetch all doctors
-        const doctorsRes = await fetch('http://localhost:3000/doctors', {
-          headers: getAuthHeaders()
-        });
-        const doctorsData = await doctorsRes.json();
-        
-        // Transform doctors data to include branches as array
-        const transformedDoctors = doctorsData.map((doctor: any) => ({
-          id: doctor.id,
-          name: doctor.name,
-          branches: parseIdsString(doctor.branches_ids),
-          department_id: doctor.department_id
-        }));
-        setAllDoctors(transformedDoctors);
-        
-        // Fetch branches
-        const branchesRes = await fetch('http://localhost:3000/branches', {
-          headers: getAuthHeaders()
-        });
-        console.log(branchesRes);
-
-        const branchesData = await branchesRes.json();
-        setBranches(branchesData);
-
-        // Fetch offers
-        await fetchOffers();
-
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setNotification({
-          open: true,
-          message: 'فشل تحميل البيانات الأولية',
-          severity: 'error'
-        });
-      } finally {
-        setFetching(false);
-      }
-    };
-
-    fetchInitialData();
-  }, []);
-
-  const fetchOffers = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/offers', {
-        headers: getAuthHeaders()
-      });
-      const data = await response.json();
-      console.log(data);
-      
-      // Transform offers data to match the expected interface
-      const transformedOffers = data.map((offer: any) => ({
-        ...offer,
-        branches: parseIdsString(offer.branches),
-        services_ids: parseIdsString(offer.services_ids),
-        doctors_ids: parseIdsString(offer.doctors_ids),
-        createdAt: {
-          _seconds: Math.floor(new Date(offer.created_at).getTime() / 1000),
-          _nanoseconds: 0
-        }
-      }));
-      setOffers(transformedOffers);
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-      setNotification({
-        open: true,
-        message: 'فشل تحميل قائمة العروض',
-        severity: 'error'
-      });
-    }
-  };
-
-  // Filter doctors when branches are selected
-  useEffect(() => {
-    if (formData.branches.length === 0) {
-      setFilteredDoctors([]);
-      setFormData(prev => ({ ...prev, doctors_ids: [] }));
-    } else {
-      const filtered = allDoctors.filter(doctor =>
-        doctor.branches.some(branchId => formData.branches.includes(branchId))
-      );
-      setFilteredDoctors(filtered);
-      // Clear selected doctors if they're not in the filtered list
-      setFormData(prev => ({
-        ...prev,
-        doctors_ids: prev.doctors_ids.filter(id => 
-          filtered.some(doctor => doctor.id === id))
-      }));
-    }
-  }, [formData.branches, allDoctors]);
-
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setNotification({
-          open: true,
-          message: 'الرجاء اختيار ملف صورة',
-          severity: 'error'
-        });
-        return;
-      }
-
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setNotification({
-          open: true,
-          message: 'يجب أن يكون حجم الملف أقل من 5 ميجابايت',
-          severity: 'error'
-        });
-        return;
-      }
-
-      setFormData(prev => ({
-        ...prev,
-        imageFile: file,
-        imageUrl: '' // Clear URL when file is selected
-      }));
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.readyState === 2) {
-          setImagePreview(reader.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const calculateDiscount = (before: number, after: number) => {
-    return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
-  };
-
-  const handleNumberChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numValue = parseFloat(value) || 0;
-    setFormData(prev => ({
-      ...prev,
-      [name]: numValue,
-      ...(name === 'priceBefore' && { 
-        discountPercentage: calculateDiscount(numValue, prev.priceAfter)
-      }),
-      ...(name === 'priceAfter' && { 
-        discountPercentage: calculateDiscount(prev.priceBefore, numValue)
-      })
-    }));
-  };
-
-  const handleMultiSelect = (type: 'branches' | 'services' | 'doctors', values: any[]) => {
-    if (type === 'branches') {
-      setFormData(prev => ({
-        ...prev,
-        branches: values,
-        doctors_ids: [] // Reset doctors when branches change
-      }));
-    } else if (type === 'services') {
-      setFormData(prev => ({
-        ...prev,
-        services_ids: values.map(item => item.id)
-      }));
-    } else if (type === 'doctors') {
-      setFormData(prev => ({
-        ...prev,
-        doctors_ids: values.map(item => item.id)
-      }));
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const formPayload = new FormData();
-      formPayload.append('title', formData.title);
-      formPayload.append('description', formData.description);
-      formPayload.append('priceBefore', formData.priceBefore.toString());
-      formPayload.append('priceAfter', formData.priceAfter.toString());
-      formPayload.append('discountPercentage', formData.discountPercentage.toString());
-      formPayload.append('branches', formData.branches.join(','));
-      formPayload.append('services_ids', formData.services_ids.join(','));
-      formPayload.append('doctors_ids', formData.doctors_ids.join(','));
-
-      if (formData.imageFile) {
-        formPayload.append('image', formData.imageFile);
-      } else if (formData.imageUrl) {
-        formPayload.append('imageUrl', formData.imageUrl);
-      }
-
-      const response = await fetch('http://localhost:3000/offers', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        },
-        body: formPayload,
-      });
-
-      if (!response.ok) throw new Error('فشل إنشاء العرض');
-
-      setNotification({
-        open: true,
-        message: 'تم إنشاء العرض بنجاح!',
-        severity: 'success'
-      });
-      
-      // Reset form and fetch updated offers list
-      setFormData({
-        title: '',
-        description: '',
-        priceBefore: 0,
-        priceAfter: 0,
-        discountPercentage: 0,
-        branches: [],
-        services_ids: [],
-        doctors_ids: [],
-        imageUrl: '',
-        imageFile: null
-      });
-      setImagePreview(null);
-      await fetchOffers();
-      
-    } catch (error) {
-      console.error('Error creating offer:', error);
-      setNotification({
-        open: true,
-        message: error instanceof Error ? error.message : 'فشل إنشاء العرض',
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const toggleOffersList = () => {
     setShowOffersList(!showOffersList);
@@ -861,11 +561,30 @@ function parseIdsString(field: any): number[] {
     setCurrentOffer(offer);
     setDialogMode('edit');
     setDialogOpen(true);
+    setEditData({
+      title: offer.title,
+      description: offer.description,
+      priceBefore: parseFloat(offer.priceBefore),
+      priceAfter: parseFloat(offer.priceAfter),
+      discountPercentage: parseFloat(offer.discountPercentage),
+      branches: offer.branches.map(b => parseInt(b)),
+      services_ids: offer.services_ids,
+      doctors_ids: offer.doctors_ids,
+      imageUrl: offer.image,
+      imageFile: null
+    });
+    setImagePreview(offer.image ? 
+      (offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`) 
+      : null);
   };
 
   const handleDeleteOffer = (id: number) => {
     setOfferToDelete(id);
     setDeleteConfirmOpen(true);
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const confirmDelete = async () => {
@@ -899,50 +618,351 @@ function parseIdsString(field: any): number[] {
     }
   };
 
-  const handleSaveOffer = async (updatedOffer: Offer) => {
-    try {
-      const formPayload = new FormData();
-      formPayload.append('title', updatedOffer.title);
-      formPayload.append('description', updatedOffer.description);
-      formPayload.append('priceBefore', updatedOffer.priceBefore);
-      formPayload.append('priceAfter', updatedOffer.priceAfter);
-      formPayload.append('discountPercentage', updatedOffer.discountPercentage);
-      formPayload.append('branches', updatedOffer.branches.join(','));
-      formPayload.append('services_ids', updatedOffer.services_ids.join(','));
-      formPayload.append('doctors_ids', updatedOffer.doctors_ids.join(','));
-
-      if (updatedOffer.image && !updatedOffer.image.startsWith('http')) {
-        // Handle image update if needed
-      }
-
-      const response = await fetch(`http://localhost:3000/offers/${updatedOffer.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        },
-        body: formPayload
-      });
-
-      if (!response.ok) throw new Error('Failed to update offer');
-
-      setNotification({
-        open: true,
-        message: 'تم تحديث العرض بنجاح',
-        severity: 'success'
-      });
-      
-      await fetchOffers();
-      setDialogOpen(false);
-    } catch (error) {
-      console.error('Error updating offer:', error);
-      setNotification({
-        open: true,
-        message: 'فشل تحديث العرض',
-        severity: 'error'
-      });
+  const clearImageSelection = () => {
+    setFormData(prev => ({
+      ...prev,
+      imageFile: null,
+      imageUrl: ''
+    }));
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [servicesRes, doctorsRes, branchesRes] = await Promise.all([
+          fetch('http://localhost:3000/services', { headers: getAuthHeaders() }),
+          fetch('http://localhost:3000/doctors', { headers: getAuthHeaders() }),
+          fetch('http://localhost:3000/branches', { headers: getAuthHeaders() })
+        ]);
+
+        const [servicesData, doctorsData, branchesData] = await Promise.all([
+          servicesRes.json(),
+          doctorsRes.json(),
+          branchesRes.json()
+        ]);
+        
+        setServices(servicesData.map((service: any) => ({
+          id: service.id,
+          name: service.title,
+          department_id: service.department_id
+        })));
+
+        setAllDoctors(doctorsData.map((doctor: any) => ({
+          id: doctor.id,
+          name: doctor.name,
+          branches: doctor.branches_ids ? JSON.parse(doctor.branches_ids) : [],
+          department_id: doctor.department_id
+        })));
+        
+        setBranches(branchesData);
+        await fetchOffers();
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setNotification({
+          open: true,
+          message: 'فشل تحميل البيانات الأولية',
+          severity: 'error'
+        });
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
+
+const fetchOffers = async () => {
+  try {
+    const response = await fetch('http://localhost:3000/offers', {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    
+    const transformedOffers = data.map((offer: any) => {
+      // Ensure branches is always an array
+      let branchesArray = [];
+      if (Array.isArray(offer.branches)) {
+        branchesArray = offer.branches;
+      } else if (typeof offer.branches === 'string') {
+        try {
+          branchesArray = JSON.parse(offer.branches);
+        } catch {
+          branchesArray = offer.branches.split(',').filter(Boolean);
+        }
+      } else if (offer.branches) {
+        branchesArray = [offer.branches];
+      }
+
+      // Ensure services_ids is always an array
+      let servicesArray = [];
+      if (Array.isArray(offer.services_ids)) {
+        servicesArray = offer.services_ids;
+      } else if (typeof offer.services_ids === 'string') {
+        try {
+          servicesArray = JSON.parse(offer.services_ids);
+        } catch {
+          servicesArray = offer.services_ids.split(',').filter(Boolean).map(Number);
+        }
+      } else if (offer.services_ids) {
+        servicesArray = [offer.services_ids];
+      }
+
+      // Ensure doctors_ids is always an array
+      let doctorsArray = [];
+      if (Array.isArray(offer.doctors_ids)) {
+        doctorsArray = offer.doctors_ids;
+      } else if (typeof offer.doctors_ids === 'string') {
+        try {
+          doctorsArray = JSON.parse(offer.doctors_ids);
+        } catch {
+          doctorsArray = offer.doctors_ids.split(',').filter(Boolean).map(Number);
+        }
+      } else if (offer.doctors_ids) {
+        doctorsArray = [offer.doctors_ids];
+      }
+
+      return {
+        ...offer,
+        branches: branchesArray.map(String), // Ensure all branches are strings
+        services_ids: servicesArray,
+        doctors_ids: doctorsArray,
+        image: offer.image || '',
+        priceBefore: offer.priceBefore?.toString() || '0',
+        priceAfter: offer.priceAfter?.toString() || '0',
+        discountPercentage: offer.discountPercentage?.toString() || '0',
+        createdAt: {
+          _seconds: Math.floor(new Date(offer.created_at || offer.createdAt?._seconds * 1000 || Date.now()).getTime() / 1000),
+          _nanoseconds: 0
+        }
+      };
+    });
+    
+    setOffers(transformedOffers);
+  } catch (error) {
+    console.error('Error fetching offers:', error);
+    setNotification({
+      open: true,
+      message: 'فشل تحميل قائمة العروض',
+      severity: 'error'
+    });
+  }
+};
+
+  useEffect(() => {
+    if (formData.branches.length === 0) {
+      setFilteredDoctors([]);
+      setFormData(prev => ({ ...prev, doctors_ids: [] }));
+    } else {
+      const filtered = allDoctors.filter(doctor =>
+        doctor.branches.some(branchId => formData.branches.includes(branchId))
+      );
+      setFilteredDoctors(filtered);
+    }
+  }, [formData.branches, allDoctors]);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      if (!file.type.startsWith('image/')) {
+        setNotification({
+          open: true,
+          message: 'الرجاء اختيار ملف صورة',
+          severity: 'error'
+        });
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setNotification({
+          open: true,
+          message: 'يجب أن يكون حجم الملف أقل من 5 ميجابايت',
+          severity: 'error'
+        });
+        return;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        imageFile: file,
+        imageUrl: ''
+      }));
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.readyState === 2) {
+          setImagePreview(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const calculateDiscount = (before: number, after: number) => {
+    return before > 0 ? Math.round(((before - after) / before) * 100) : 0;
+  };
+
+  const handleNumberChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const numValue = parseFloat(value) || 0;
+    setFormData(prev => ({
+      ...prev,
+      [name]: numValue,
+      ...(name === 'priceBefore' && { 
+        discountPercentage: calculateDiscount(numValue, prev.priceAfter)
+      }),
+      ...(name === 'priceAfter' && { 
+        discountPercentage: calculateDiscount(prev.priceBefore, numValue)
+      })
+    }));
+  };
+
+  const handleMultiSelect = (type: 'branches' | 'services' | 'doctors', values: any[]) => {
+    if (type === 'branches') {
+      setFormData(prev => ({
+        ...prev,
+        branches: values,
+        doctors_ids: []
+      }));
+    } else if (type === 'services') {
+      setFormData(prev => ({
+        ...prev,
+        services_ids: values.map(item => item.id)
+      }));
+    } else if (type === 'doctors') {
+      setFormData(prev => ({
+        ...prev,
+        doctors_ids: values.map(item => item.id)
+      }));
+    }
+  };
+
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+
+  try {
+    const formPayload = new FormData();
+    formPayload.append('title', formData.title);
+    formPayload.append('description', formData.description);
+    formPayload.append('priceBefore', formData.priceBefore.toString());
+    formPayload.append('priceAfter', formData.priceAfter.toString());
+    formPayload.append('discountPercentage', formData.discountPercentage.toString());
+    formPayload.append('branches', JSON.stringify(formData.branches));
+    formPayload.append('services_ids', JSON.stringify(formData.services_ids));
+    formPayload.append('doctors_ids', JSON.stringify(formData.doctors_ids));
+
+    // Handle image upload - either file or URL
+    if (formData.imageFile) {
+      formPayload.append('image', formData.imageFile);
+    } else if (formData.imageUrl) {
+      formPayload.append('imageUrl', formData.imageUrl);
+    }
+
+    const response = await fetch('http://localhost:3000/offers', {
+      method: 'POST',
+      headers: getAuthHeaders(), // Don't set Content-Type for FormData
+      body: formPayload,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create offer');
+    }
+
+    setNotification({
+      open: true,
+      message: 'Offer created successfully!',
+      severity: 'success'
+    });
+    
+    // Reset form
+    setFormData({
+      title: '',
+      description: '',
+      priceBefore: 0,
+      priceAfter: 0,
+      discountPercentage: 0,
+      branches: [],
+      services_ids: [],
+      doctors_ids: [],
+      imageUrl: '',
+      imageFile: null
+    });
+    setImagePreview(null);
+    await fetchOffers();
+    
+  } catch (error) {
+    console.error('Error creating offer:', error);
+    setNotification({
+      open: true,
+      message: error instanceof Error ? error.message : 'Failed to create offer',
+      severity: 'error'
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleSaveOffer = async (updatedOffer: Offer) => {
+  try {
+    const formPayload = new FormData();
+    formPayload.append('title', updatedOffer.title);
+    formPayload.append('description', updatedOffer.description);
+    formPayload.append('priceBefore', updatedOffer.priceBefore);
+    formPayload.append('priceAfter', updatedOffer.priceAfter);
+    formPayload.append('discountPercentage', updatedOffer.discountPercentage);
+    formPayload.append('branches', JSON.stringify(updatedOffer.branches));
+    formPayload.append('services_ids', JSON.stringify(updatedOffer.services_ids));
+    formPayload.append('doctors_ids', JSON.stringify(updatedOffer.doctors_ids));
+
+    if (editData.imageFile) {
+      formPayload.append('image', editData.imageFile);
+    } else if (editData.imageUrl) {
+      formPayload.append('imageUrl', editData.imageUrl);
+    }
+
+    const response = await fetch(`http://localhost:3000/offers/${updatedOffer.id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: formPayload
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update offer');
+    }
+
+    setNotification({
+      open: true,
+      message: 'Offer updated successfully',
+      severity: 'success'
+    });
+    
+    await fetchOffers();
+    setDialogOpen(false);
+  } catch (error) {
+    console.error('Error updating offer:', error);
+    setNotification({
+      open: true,
+      message: error instanceof Error ? error.message : 'Failed to update offer',
+      severity: 'error'
+    });
+  }
+};
   if (fetching) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -996,12 +1016,13 @@ function parseIdsString(field: any): number[] {
                     offers.map((offer) => (
                       <TableRow key={offer.id}>
                         <TableCell>
-                          <Avatar 
-                            src={offer.image} 
-                            alt={offer.title}
-                            variant="rounded"
-                            sx={{ width: 60, height: 60 }}
-                          />
+                          {offer.image && (
+                            <img 
+                              src={offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`}
+                              alt={offer.title}
+                              style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography fontWeight="bold">{offer.title}</Typography>
@@ -1087,53 +1108,58 @@ function parseIdsString(field: any): number[] {
                 variant="outlined"
               />
 
-              <Box>
-                <Typography variant="subtitle1" gutterBottom>صورة العرض</Typography>
-                <Box display="flex" alignItems="center" gap={2}>
-                  {imagePreview && (
-                    <Avatar 
-                      src={imagePreview} 
-                      variant="rounded"
-                      sx={{ width: 100, height: 100 }}
-                    />
-                  )}
-                  <TextField
-                    fullWidth
-                    label="رابط الصورة"
-                    name="imageUrl"
-                    value={formData.imageUrl}
-                    onChange={handleChange}
-                    variant="outlined"
-                    placeholder="https://example.com/image.jpg"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Link />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <Button
-                            variant="outlined"
-                            startIcon={<CloudUpload />}
-                            onClick={triggerFileInput}
-                          >
-                            رفع صورة
-                          </Button>
-                        </InputAdornment>
-                      ),
-                    }}
-                    disabled={!!formData.imageFile}
-                  />
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                </Box>
-              </Box>
+            <Box>
+  <Typography variant="subtitle1" gutterBottom>Offer Image</Typography>
+  <Box display="flex" alignItems="center" gap={2}>
+    {imagePreview && (
+      <>
+        <img 
+          src={imagePreview}
+          alt="Preview"
+          style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: '4px' }}
+        />
+        <IconButton onClick={clearImageSelection} color="error">
+          <CloseIcon />
+        </IconButton>
+      </>
+    )}
+    <TextField
+      fullWidth
+      label="Image URL"
+      name="imageUrl"
+      value={formData.imageUrl}
+      onChange={handleChange}
+      variant="outlined"
+      placeholder="https://example.com/image.jpg"
+      disabled={!!formData.imageFile}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Link />
+          </InputAdornment>
+        ),
+        endAdornment: (
+          <InputAdornment position="end">
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<CloudUpload />}
+            >
+              Upload Image
+              <input
+                type="file"
+                hidden
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+              />
+            </Button>
+          </InputAdornment>
+        ),
+      }}
+    />
+  </Box>
+</Box>
 
               <Divider>
                 <Chip label="معلومات التسعير" />
@@ -1186,20 +1212,20 @@ function parseIdsString(field: any): number[] {
                 <Chip label="العناصر المرتبطة" />
               </Divider>
 
-        <Autocomplete
-  multiple
-  options={branches}
-  getOptionLabel={(option) => option.name}
-  value={branches.filter(b => formData.branches.includes(b.id))}
-  onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
-  renderInput={(params) => (
-    <TextField
-      {...params}
-      label="الفروع"
-      placeholder="اختر الفروع"
-    />
-  )}
-/>
+              <Autocomplete
+                multiple
+                options={branches}
+                getOptionLabel={(option) => option.name}
+                value={branches.filter(b => formData.branches.includes(b.id))}
+                onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="الفروع"
+                    placeholder="اختر الفروع"
+                  />
+                )}
+              />
 
               <Autocomplete
                 multiple
@@ -1215,21 +1241,22 @@ function parseIdsString(field: any): number[] {
                   />
                 )}
               />
-<Autocomplete
-  multiple
-  options={filteredDoctors}  // or allDoctors depending on your needs
-  getOptionLabel={(option) => option.name}
-  value={filteredDoctors.filter(d => formData.doctors_ids.includes(d.id))}
-  onChange={(_, value) => handleMultiSelect('doctors', value)}
-  disabled={formData.branches.length === 0}
-  renderInput={(params) => (
-    <TextField
-      {...params}
-      label="الأطباء"
-      placeholder={formData.branches.length === 0 ? "اختر الفروع أولا" : "اختر الأطباء"}
-    />
-  )}
-/>
+
+              <Autocomplete
+                multiple
+                options={filteredDoctors}
+                getOptionLabel={(option) => option.name}
+                value={allDoctors.filter(d => formData.doctors_ids.includes(d.id))}
+                onChange={(_, value) => handleMultiSelect('doctors', value)}
+                disabled={formData.branches.length === 0}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="الأطباء"
+                    placeholder={formData.branches.length === 0 ? "اختر الفروع أولا" : "اختر الأطباء"}
+                  />
+                )}
+              />
 
               <Box display="flex" justifyContent="flex-end" gap={2} mt={4}>
                 <Button
@@ -1269,16 +1296,20 @@ function parseIdsString(field: any): number[] {
         </CardContent>
       </Card>
 
-      <OfferDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        offer={currentOffer}
-        mode={dialogMode}
-        onSave={handleSaveOffer}
-        services={services}
-        branches={branches}
-        doctors={allDoctors}
-      />
+    <OfferDialog
+  open={dialogOpen}
+  onClose={() => setDialogOpen(false)}
+  offer={currentOffer}
+  mode={dialogMode}
+  onSave={handleSaveOffer}
+  services={services}
+  branches={branches}
+  doctors={allDoctors}
+  editData={editData}
+  setEditData={setEditData}
+  imagePreview={imagePreview}
+  setImagePreview={setImagePreview}
+/>
 
       <Dialog
         open={deleteConfirmOpen}

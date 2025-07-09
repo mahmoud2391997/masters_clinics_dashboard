@@ -4,10 +4,10 @@ export function getImageUrl(image: string): string {
   if (/^https?:\/\//.test(image)) return image;
 
   if (image.startsWith("/public") || image.startsWith("/uploads")) {
-    console.log(`Image URL: https://www.ss.mastersclinics.com${image}`);
+    console.log(`Image URL: http://localhost:3000${image}`);
     
-    return `https://www.ss.mastersclinics.com${image}`;
+    return `http://localhost:3000${image}`;
   }
 
-  return `https://www.ss.mastersclinics.com/public/uploads/${image}`;
+  return `http://localhost:3000/public/uploads/${image}`;
 };

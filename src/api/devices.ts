@@ -1,6 +1,7 @@
 import axios, { type AxiosRequestConfig } from "axios";
 
 interface WorkingTimeSlot {
+  day: string;
   type: 'singleDate' | 'dateRange';
   date?: string; // ISO format: e.g., "2025-06-02"
   startTime?: string; // "HH:mm"
