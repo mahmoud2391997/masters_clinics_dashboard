@@ -104,7 +104,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
     if (!window.confirm("هل أنت متأكد أنك تريد حذف هذا القسم؟")) return;
     setDeleting(true);
     try {
-      await axios.delete(`http://localhost:3000/departments/${department.id}`, {
+      await axios.delete(`https://www.ss.mastersclinics.com/departments/${department.id}`, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
       });
       onDeleteSuccess();
@@ -129,7 +129,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
       }
       formData.append("branch_ids", JSON.stringify(selectedBranchIds));
 
-      await axios.put(`http://localhost:3000/departments/${department.id}`, formData, {
+      await axios.put(`https://www.ss.mastersclinics.com/departments/${department.id}`, formData, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
       });
 
@@ -189,7 +189,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
             <CardMedia
               component="img"
               height="180"
-              image={`http://localhost:3000${department.image}`}
+              image={`https://www.ss.mastersclinics.com${department.image}`}
               alt={department.name}
               className="object-cover"
               onLoad={() => setImageLoading(false)}
@@ -257,7 +257,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
               <Button component="label" variant="outlined" startIcon={<CloudUpload />} fullWidth sx={{ mb: 2 }}>رفع صورة جديدة<VisuallyHiddenInput type="file" accept="image/*" onChange={handleImageChange} /></Button>
               {(previewImage || department.image) && (
                 <Box mt={2} textAlign="center" position="relative">
-                  <img src={previewImage || `http://localhost:3000${department.image}`} alt="Preview" style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: '8px', border: '1px solid #e0e0e0' }} />
+                  <img src={previewImage || `https://www.ss.mastersclinics.com${department.image}`} alt="Preview" style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: '8px', border: '1px solid #e0e0e0' }} />
                   <IconButton onClick={handleRemoveImage} color="error" sx={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.7)', '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' } }}><Delete fontSize="small" /></IconButton>
                 </Box>
               )}

@@ -1,7 +1,8 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCalendarCheck,  faCity,   faGift,   faHouseMedical,   faLaptopMedical,   faPager,  faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarCheck,  faCity,   faFileMedicalAlt,   faGift,   faHouseMedical,   faLaptopMedical,   faPager,  faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
 import { useState } from "react";
+import { Article, ArticleOutlined } from "@mui/icons-material";
 export default function Sidebar({ toggleSidebar }: { toggleSidebar: (state: boolean) => void }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function Sidebar({ toggleSidebar }: { toggleSidebar: (state: bool
         { label: "الخدمات", icon: faStethoscope, path: "/services" },
         { label: "العروض", icon: faGift, path: "/offers" },
         { label: "الاجهزة", icon: faLaptopMedical, path: "/devices" },
+        { label: "المقالات", icon: faFileMedicalAlt, path: "/blogs" },
         
     ] : []),
         { label: "تسجيل الخروج", icon: faSignOutAlt, path: "/logout", isLogout: true },

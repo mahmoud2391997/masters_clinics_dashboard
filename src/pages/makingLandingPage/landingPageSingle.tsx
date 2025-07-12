@@ -122,10 +122,10 @@ const getImageUrl = (image: string | File | undefined): string => {
   if (/^https?:\/\//.test(image)) return image;
 
   if (image.startsWith("/public") || image.startsWith("/uploads")) {
-    return `http://localhost:3000${image}`;
+    return `https://www.ss.mastersclinics.com${image}`;
   }
 
-  return `http://localhost:3000/public/uploads/${image}`;
+  return `https://www.ss.mastersclinics.com/public/uploads/${image}`;
 };
 
 const LandingPageEditor = () => {

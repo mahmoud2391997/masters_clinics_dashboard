@@ -297,7 +297,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
                 <Typography variant="h6">صورة العرض</Typography>
                 <Box display="flex" justifyContent="center">
                   <img 
-                    src={offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`}
+                    src={offer.image.startsWith('http') ? offer.image : `https://www.ss.mastersclinics.com${offer.image}`}
                     alt={offer.title}
                     style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
                   />
@@ -574,7 +574,7 @@ const OfferAddForm = () => {
       imageFile: null
     });
     setImagePreview(offer.image ? 
-      (offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`) 
+      (offer.image.startsWith('http') ? offer.image : `https://www.ss.mastersclinics.com${offer.image}`) 
       : null);
   };
 
@@ -583,15 +583,13 @@ const OfferAddForm = () => {
     setDeleteConfirmOpen(true);
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
+
 
   const confirmDelete = async () => {
     if (!offerToDelete) return;
     
     try {
-      const response = await fetch(`http://localhost:3000/offers/${offerToDelete}`, {
+      const response = await fetch(`https://www.ss.mastersclinics.com/offers/${offerToDelete}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -634,9 +632,9 @@ const OfferAddForm = () => {
     const fetchInitialData = async () => {
       try {
         const [servicesRes, doctorsRes, branchesRes] = await Promise.all([
-          fetch('http://localhost:3000/services', { headers: getAuthHeaders() }),
-          fetch('http://localhost:3000/doctors', { headers: getAuthHeaders() }),
-          fetch('http://localhost:3000/branches', { headers: getAuthHeaders() })
+          fetch('https://www.ss.mastersclinics.com/services', { headers: getAuthHeaders() }),
+          fetch('https://www.ss.mastersclinics.com/doctors', { headers: getAuthHeaders() }),
+          fetch('https://www.ss.mastersclinics.com/branches', { headers: getAuthHeaders() })
         ]);
 
         const [servicesData, doctorsData, branchesData] = await Promise.all([
@@ -678,7 +676,7 @@ const OfferAddForm = () => {
 
 const fetchOffers = async () => {
   try {
-    const response = await fetch('http://localhost:3000/offers', {
+    const response = await fetch('https://www.ss.mastersclinics.com/offers', {
       headers: getAuthHeaders()
     });
     const data = await response.json();
@@ -872,7 +870,7 @@ const handleSubmit = async (e: FormEvent) => {
       formPayload.append('imageUrl', formData.imageUrl);
     }
 
-    const response = await fetch('http://localhost:3000/offers', {
+    const response = await fetch('https://www.ss.mastersclinics.com/offers', {
       method: 'POST',
       headers: getAuthHeaders(), // Don't set Content-Type for FormData
       body: formPayload,
@@ -935,7 +933,7 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
       formPayload.append('imageUrl', editData.imageUrl);
     }
 
-    const response = await fetch(`http://localhost:3000/offers/${updatedOffer.id}`, {
+    const response = await fetch(`https://www.ss.mastersclinics.com/offers/${updatedOffer.id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: formPayload
@@ -1018,7 +1016,7 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                         <TableCell>
                           {offer.image && (
                             <img 
-                              src={offer.image.startsWith('http') ? offer.image : `http://localhost:3000${offer.image}`}
+                              src={offer.image.startsWith('http') ? offer.image : `https://www.ss.mastersclinics.com${offer.image}`}
                               alt={offer.title}
                               style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
                             />

@@ -1,4 +1,5 @@
 interface WorkingTimeSlot {
+    day: string;
     type: 'singleDate' | 'dateRange';
     date?: string;
     startTime?: string;

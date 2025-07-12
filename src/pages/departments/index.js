@@ -28,7 +28,7 @@ const DepartmentsStatsGrid = () => {
     const fetchDepartments = async () => {
         setLoading(true);
         try {
-            const res = await axios.get("http://localhost:3000/departments", {
+            const res = await axios.get("https://www.ss.mastersclinics.com/departments", {
                 headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
             });
             const parsedDepartments = res.data.map((dept) => ({
@@ -50,7 +50,7 @@ const DepartmentsStatsGrid = () => {
     };
     const fetchBranches = async () => {
         try {
-            const res = await axios.get("http://localhost:3000/branches", {
+            const res = await axios.get("https://www.ss.mastersclinics.com/branches", {
                 headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
             });
             setBranches(res.data);
@@ -96,7 +96,7 @@ const DepartmentsStatsGrid = () => {
                 formData.append("image", newDeptImageFile);
             }
             formData.append("branch_ids", JSON.stringify(selectedBranchIds));
-            const res = await axios.post("http://localhost:3000/departments", formData, {
+            const res = await axios.post("https://www.ss.mastersclinics.com/departments", formData, {
                 headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
             });
             setDepartments((prev) => [...prev, res.data]);

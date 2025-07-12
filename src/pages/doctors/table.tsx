@@ -103,7 +103,7 @@ const DoctorTable: React.FC = () => {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await axios.get<Doctor[]>('http://localhost:3000/doctors', {
+        const response = await axios.get<Doctor[]>('https://www.ss.mastersclinics.com/doctors', {
           headers: {
             Authorization: `Bearer ${sessionStorage.getItem('token')}`,
           },
@@ -126,10 +126,10 @@ const DoctorTable: React.FC = () => {
     const fetchOptions = async () => {
       try {
         const [branchesRes, departmentsRes] = await Promise.all([
-          axios.get<Branch[]>('http://localhost:3000/branches', {
+          axios.get<Branch[]>('https://www.ss.mastersclinics.com/branches', {
             headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
           }),
-          axios.get<Department[]>('http://localhost:3000/departments', {
+          axios.get<Department[]>('https://www.ss.mastersclinics.com/departments', {
             headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
           }),
         ]);
@@ -202,7 +202,7 @@ const DoctorTable: React.FC = () => {
         formData.append('image', imageFile);
       }
 
-      const response = await axios.post('http://localhost:3000/doctors', formData, {
+      const response = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
           'Content-Type': 'multipart/form-data',

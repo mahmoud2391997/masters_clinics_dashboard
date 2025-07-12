@@ -37,7 +37,7 @@ interface Service {
   updated_at: string;
 }
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://www.ss.mastersclinics.com';
 
 const getAuthToken = (): string | null => {
   return sessionStorage.getItem('token');

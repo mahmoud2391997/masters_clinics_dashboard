@@ -21,7 +21,7 @@ const SubservicesPage = () => {
     useEffect(() => {
         const fetchSubservices = async () => {
             try {
-                const response = await fetch(`http://localhost:3000/subServices?serviceId=${id}`, {
+                const response = await fetch(`https://www.ss.mastersclinics.com/subServices?serviceId=${id}`, {
                     headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
                 });
                 const data = await response.json();
@@ -45,7 +45,7 @@ const SubservicesPage = () => {
         if (!selectedSubservice)
             return;
         try {
-            await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
+            await fetch(`https://www.ss.mastersclinics.com/subServices/${selectedSubservice.id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
             });
@@ -97,7 +97,7 @@ const SubservicesPage = () => {
             if (imageFile) {
                 formDataToSend.append('image', imageFile);
             }
-            const response = await fetch(`http://localhost:3000/subServices/${selectedSubservice.id}`, {
+            const response = await fetch(`https://www.ss.mastersclinics.com/subServices/${selectedSubservice.id}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${sessionStorage.getItem('token')}`,

@@ -15,6 +15,7 @@ import OffersPage from "./pages/offers";
 import CategorySinglePage from "./pages/services/singleService";
 import MedicalDevicesPage from "./pages/devices";
 import LandingPageEditor from "./pages/makingLandingPage/landingPageSingle";
+import BlogsDashboard from "./pages/blogs";
 
 function App() {
 
@@ -34,7 +35,7 @@ const navigate = useNavigate();
       }
 
       try {
-        const res = await fetch('http://localhost:3000/protected', {
+        const res = await fetch('https://www.ss.mastersclinics.com/protected', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -90,6 +91,7 @@ console.log(role);
                 <Route path="/landingPage/:id" element={<LandingPageEditor />} />
               )}
               <Route path="/doctors" element={<DataTableHeaders />} />
+              <Route path="/blogs" element={<BlogsDashboard />} />
               <Route path="/doctors/:id" element={<DoctorSingle />} />
               <Route path="/departments" element={<DepartmentsStatsGrid />} />
               <Route path="/branches/:id" element={<BranchSingle />} />

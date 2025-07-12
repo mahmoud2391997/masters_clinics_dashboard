@@ -37,7 +37,7 @@ interface Region {
 }
 
 async function fetchBranch(id: string): Promise<Branch> {
-  const response = await fetch(`http://localhost:3000/branches/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`, {
     headers: {
       'Content-Type': 'application/json',
       "Authorization": `Bearer ${sessionStorage.getItem("token")}`
@@ -56,7 +56,7 @@ async function fetchBranch(id: string): Promise<Branch> {
 }
 
 async function fetchRegions(): Promise<Region[]> {
-  const response = await fetch('http://localhost:3000/regions', {
+  const response = await fetch('https://www.ss.mastersclinics.com/regions', {
     headers: {
       'Content-Type': 'application/json',
       "Authorization": `Bearer ${sessionStorage.getItem("token")}`
@@ -78,7 +78,7 @@ async function updateBranch(id: number, data: Partial<Branch> & { imageFile?: Fi
   if (data.coordinates?.longitude) formData.append('longitude', data.coordinates.longitude);
   if (data.imageFile) formData.append('image', data.imageFile);
 
-  const response = await fetch(`http://localhost:3000/branches/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/branches/${id}`, {
     method: 'PUT',
     headers: {
       "Authorization": `Bearer ${sessionStorage.getItem("token")}`

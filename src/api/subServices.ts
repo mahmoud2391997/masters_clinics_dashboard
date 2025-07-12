@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/subServices';
+const API_URL = 'https://www.ss.mastersclinics.com/subServices';
 
 function getAuthHeaders() {
     const token = sessionStorage.getItem('token');
@@ -11,7 +11,7 @@ function getAuthHeaders() {
 
 // src/api/services.ts
 export const editSubService = async (id: string, formData: FormData) => {
-  const response = await fetch(`http://localhost:3000/subServices/${id}`, {
+  const response = await fetch(`https://www.ss.mastersclinics.com/subServices/${id}`, {
     method: 'PUT',
     body: formData,
     headers: {

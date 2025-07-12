@@ -57,7 +57,7 @@ const DepartmentsStatsGrid: React.FC = () => {
 const fetchDepartments = async () => {
   setLoading(true);
   try {
-    const res = await axios.get("http://localhost:3000/departments", {
+    const res = await axios.get("https://www.ss.mastersclinics.com/departments", {
       headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
     });
 
@@ -81,7 +81,7 @@ setDepartments(parsedDepartments);
 
   const fetchBranches = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/branches", {
+      const res = await axios.get("https://www.ss.mastersclinics.com/branches", {
         headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
       });
       setBranches(res.data);
@@ -132,7 +132,7 @@ setDepartments(parsedDepartments);
       }
       formData.append("branch_ids", JSON.stringify(selectedBranchIds));
 
-      const res = await axios.post("http://localhost:3000/departments", formData, {
+      const res = await axios.post("https://www.ss.mastersclinics.com/departments", formData, {
         headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
       });
 

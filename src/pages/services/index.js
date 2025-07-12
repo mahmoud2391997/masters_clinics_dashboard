@@ -44,16 +44,16 @@ export default function AddService() {
                 });
                 // Fetch all data in parallel
                 const [servicesRes, departmentsRes, doctorsRes, branchesRes] = await Promise.all([
-                    fetch("http://localhost:3000/services", {
+                    fetch("https://www.ss.mastersclinics.com/services", {
                         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
                     }),
-                    fetch("http://localhost:3000/departments", {
+                    fetch("https://www.ss.mastersclinics.com/departments", {
                         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
                     }),
-                    fetch("http://localhost:3000/doctors", {
+                    fetch("https://www.ss.mastersclinics.com/doctors", {
                         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
                     }),
-                    fetch("http://localhost:3000/branches", {
+                    fetch("https://www.ss.mastersclinics.com/branches", {
                         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
                     })
                 ]);
@@ -160,8 +160,8 @@ export default function AddService() {
             formData.append("image", imageFile);
         try {
             const url = isEditing && editingService
-                ? `http://localhost:3000/services/${editingService.id}`
-                : "http://localhost:3000/services";
+                ? `https://www.ss.mastersclinics.com/services/${editingService.id}`
+                : "https://www.ss.mastersclinics.com/services";
             const method = isEditing ? "PUT" : "POST";
             const response = await fetch(url, {
                 method,
@@ -201,7 +201,7 @@ export default function AddService() {
         if (!window.confirm("هل أنت متأكد من حذف هذه الخدمة؟"))
             return;
         try {
-            const response = await fetch(`http://localhost:3000/services/${id}`, {
+            const response = await fetch(`https://www.ss.mastersclinics.com/services/${id}`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${sessionStorage.getItem("token")}`
@@ -230,7 +230,7 @@ export default function AddService() {
                                 id: service.id,
                                 name: service.title,
                                 description: service.description,
-                                imageUrl: service.image ? `http://localhost:3000${service.image}` : "",
+                                imageUrl: service.image ? `https://www.ss.mastersclinics.com${service.image}` : "",
                                 capabilities: service.capabilities,
                                 approach: service.approach,
                                 doctors: service.doctors_ids.map(id => {
@@ -255,7 +255,7 @@ export default function AddService() {
                                 setDepartmentId(service.department_id);
                                 setSelectedBranches(service.branches);
                                 setSelectedDoctors(service.doctors_ids);
-                                setImagePreview(service.image ? `http://localhost:3000${service.image}` : undefined);
+                                setImagePreview(service.image ? `https://www.ss.mastersclinics.com${service.image}` : undefined);
                                 window.scrollTo({ top: 0, behavior: "smooth" });
                             }, handleDelete: () => handleDelete(service.id) }, service.id))) }))] })] }));
 }

@@ -45,7 +45,7 @@ const DoctorSingle = () => {
         const fetchDoctor = async () => {
             try {
                 setLoading(true);
-                const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`);
+                const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`);
                 if (!res.ok) {
                     throw new Error(`HTTP error! status: ${res.status}`);
                 }
@@ -76,8 +76,8 @@ const DoctorSingle = () => {
             try {
                 setOptionsLoading(true);
                 const [branchesRes, departmentsRes] = await Promise.all([
-                    fetchWithAuth('http://localhost:3000/branches'),
-                    fetchWithAuth('http://localhost:3000/departments')
+                    fetchWithAuth('https://www.ss.mastersclinics.com/branches'),
+                    fetchWithAuth('https://www.ss.mastersclinics.com/departments')
                 ]);
                 if (!branchesRes.ok || !departmentsRes.ok) {
                     throw new Error('Failed to fetch options');
@@ -181,7 +181,7 @@ const DoctorSingle = () => {
             else if (!useFileUpload && form.image) {
                 formData.append('imageUrl', form.image);
             }
-            const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`, {
+            const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
                 method: 'PUT',
                 body: formData,
             });
@@ -216,7 +216,7 @@ const DoctorSingle = () => {
         if (!window.confirm('هل أنت متأكد أنك تريد حذف هذا الطبيب؟'))
             return;
         try {
-            const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`, {
+            const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
                 method: 'DELETE',
             });
             if (!res.ok) {

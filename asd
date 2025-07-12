@@ -9,15 +9,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <meta charset="utf-8"/><link rel="icon" href="https://cdn.salla.sa/cdn-cgi/image/fit=scale-down,width=400,height=400,onerror=redirect,format=auto/dEYvd/lBmMUm3zZyt94KtrsYYdL6UrUEOoncu4UJnK9VhR.png"/><!-- Open Graph Meta Tags for Social Sharing -->
 <meta property="og:title" content="ماسترز كلينكس | احجزي موعدك مع أفضل أطباء التجميل والجلدية" />
 <meta property="og:description" content="جلسات نضارة، تقشير، ليزر، بوتوكس، فيلر، وعلاج تساقط الشعر في عيادات ماسترز. تواصلي معنا الآن لحجز موعد فوري!" />
-<meta property="og:image" content="http://localhost:3000/logo.jpg" />
-<meta property="og:url" content="http://localhost:3000/" />
+<meta property="og:image" content="https://www.ss.mastersclinics.com/logo.jpg" />
+<meta property="og:url" content="https://www.ss.mastersclinics.com/" />
 <meta property="og:type" content="website" />
 
 <!-- Twitter Card Meta Tags -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="ماسترز كلينكس | احجزي موعدك مع أفضل أطباء التجميل والجلدية" />
 <meta name="twitter:description" content="احجزي موعدك الآن في عيادات ماسترز مع نخبة من خبراء التجميل والجلدية." />
-<meta name="twitter:image" content="http://localhost:3000/logo.jpg" />
+<meta name="twitter:image" content="https://www.ss.mastersclinics.com/logo.jpg" />
 
 <!-- Structured Data (JSON-LD for a WebPage) -->
 <script type="application/ld+json">
@@ -26,13 +26,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   "@type": "WebPage",
   "name": "ماسترز كلينكس | حجز موعد",
   "description": "احجزي موعدك مع أفضل أطباء الجلدية والتجميل في عيادات ماسترز. جلسات نضارة، علاج حب الشباب، ليزر، بوتوكس، فيلر وأكثر.",
-  "url": "http://localhost:3000/",
+  "url": "https://www.ss.mastersclinics.com/",
   "publisher": {
     "@type": "Organization",
     "name": "ماسترز كلينكس",
     "logo": {
       "@type": "ImageObject",
-      "url": "http://localhost:3000/logo.jpg"
+      "url": "https://www.ss.mastersclinics.com/logo.jpg"
     }
   }
 }
