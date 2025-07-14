@@ -2,8 +2,25 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import ServiceCard from "../../components/serviceCard";
 import { message, Select } from "antd";
+// دالة مساعدة لتحليل سلاسل JSON بأمان
+const safeJsonParse = (jsonString) => {
+    if (!jsonString)
+        return [];
+    try {
+        // التعامل مع الحالات حيث قد يكون JSON مغلفًا بعلامات اقتباس
+        const trimmed = jsonString.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+            return JSON.parse(JSON.parse(trimmed));
+        }
+        return JSON.parse(trimmed);
+    }
+    catch (e) {
+        console.error('فشل في تحليل JSON:', jsonString);
+        return [];
+    }
+};
 export default function AddService() {
-    // Form state
+    // حالة النموذج
     const [title, setTitle] = useState("");
     const [subtitle, setSubtitle] = useState("");
     const [description, setDescription] = useState("");
@@ -11,18 +28,18 @@ export default function AddService() {
     const [approach, setApproach] = useState("");
     const [departmentId, setDepartmentId] = useState();
     const [newCapability, setNewCapability] = useState("");
-    // Media state
+    // حالة الوسائط
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState("");
-    // Selection state
+    // حالة التحديد
     const [selectedBranches, setSelectedBranches] = useState([]);
     const [selectedDoctors, setSelectedDoctors] = useState([]);
-    // Data state
+    // حالة البيانات
     const [services, setServices] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [allDoctors, setAllDoctors] = useState([]);
     const [allBranches, setAllBranches] = useState([]);
-    // UI state
+    // حالة واجهة المستخدم
     const [error, setError] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editingService, setEditingService] = useState(null);
@@ -32,7 +49,7 @@ export default function AddService() {
         doctors: false,
         branches: false
     });
-    // Load initial data
+    // تحميل البيانات الأولية
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -42,7 +59,7 @@ export default function AddService() {
                     doctors: true,
                     branches: true
                 });
-                // Fetch all data in parallel
+                // جلب جميع البيانات بالتوازي
                 const [servicesRes, departmentsRes, doctorsRes, branchesRes] = await Promise.all([
                     fetch("https://www.ss.mastersclinics.com/services", {
                         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
@@ -69,13 +86,13 @@ export default function AddService() {
                 const departmentsData = await departmentsRes.json();
                 const doctorsData = await doctorsRes.json();
                 const branchesData = await branchesRes.json();
-                // Normalize services data
+                // توحيد بيانات الخدمات
                 const normalizedServices = servicesData.map((service) => ({
                     ...service,
                     id: String(service.id),
-                    branches: service.branches ? JSON.parse(service.branches) : [],
-                    doctors_ids: service.doctors_ids ? JSON.parse(service.doctors_ids) : [],
-                    capabilities: service.capabilities ? JSON.parse(service.capabilities) : [],
+                    branches: safeJsonParse(service.branches_raw || service.branches),
+                    doctors_ids: safeJsonParse(service.doctors_ids_raw || service.doctors_ids).map(String),
+                    capabilities: safeJsonParse(service.capabilities),
                     department_id: service.department_id || undefined
                 }));
                 setServices(normalizedServices);
@@ -85,7 +102,7 @@ export default function AddService() {
             }
             catch (err) {
                 setError(err instanceof Error ? err.message : "فشل تحميل البيانات");
-                console.error("Error fetching data:", err);
+                console.error("خطأ في جلب البيانات:", err);
             }
             finally {
                 setIsLoading({
@@ -178,9 +195,9 @@ export default function AddService() {
             const normalizedService = {
                 ...savedService,
                 id: String(savedService.id),
-                branches: savedService.branches ? JSON.parse(savedService.branches) : [],
-                doctors_ids: savedService.doctors_ids ? JSON.parse(savedService.doctors_ids) : [],
-                capabilities: savedService.capabilities ? JSON.parse(savedService.capabilities) : [],
+                branches: safeJsonParse(savedService.branches_raw || savedService.branches),
+                doctors_ids: safeJsonParse(savedService.doctors_ids_raw || savedService.doctors_ids).map(String),
+                capabilities: safeJsonParse(savedService.capabilities),
                 department_id: savedService.department_id || undefined
             };
             setServices(prev => isEditing

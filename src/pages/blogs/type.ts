@@ -1,5 +1,5 @@
 export interface Blog {
-  id?: number;
+  id: number;
   slug: string;
   title2: string;
   author: string;
@@ -8,4 +8,5 @@ export interface Blog {
   categories?: string[];
   image?: string;
   create_at?: string;
+  date?: string;
 }

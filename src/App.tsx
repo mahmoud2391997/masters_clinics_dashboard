@@ -16,6 +16,8 @@ import CategorySinglePage from "./pages/services/singleService";
 import MedicalDevicesPage from "./pages/devices";
 import LandingPageEditor from "./pages/makingLandingPage/landingPageSingle";
 import BlogsDashboard from "./pages/blogs";
+import BlogSinglePage from "./pages/blogs/singleBlog";
+import TestimonialsDashboard from "./pages/reviews";
 
 function App() {
 
@@ -91,7 +93,9 @@ console.log(role);
                 <Route path="/landingPage/:id" element={<LandingPageEditor />} />
               )}
               <Route path="/doctors" element={<DataTableHeaders />} />
+              <Route path="/testimonials" element={<TestimonialsDashboard />} />
               <Route path="/blogs" element={<BlogsDashboard />} />
+              <Route path="/blogs/:id" element={<BlogSinglePage />} />
               <Route path="/doctors/:id" element={<DoctorSingle />} />
               <Route path="/departments" element={<DepartmentsStatsGrid />} />
               <Route path="/branches/:id" element={<BranchSingle />} />
