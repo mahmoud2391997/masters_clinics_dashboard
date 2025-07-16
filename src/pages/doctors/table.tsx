@@ -15,14 +15,14 @@ import {
   DialogContent,
   DialogActions,
   Stack,
-
   TableBody,
   Checkbox,
   MenuItem,
   LinearProgress,
-  CircularProgress
+  CircularProgress,
+  IconButton
 } from '@mui/material';
-import { Add,  Save } from '@mui/icons-material';
+import { Add, Save, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
@@ -63,13 +63,14 @@ interface Department {
   name: string;
 }
 
-
-
 const DoctorTable: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [doctorToDelete, setDoctorToDelete] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [newDoctor, setNewDoctor] = useState<Partial<Doctor>>({
     name: '',
@@ -108,8 +109,6 @@ const DoctorTable: React.FC = () => {
             Authorization: `Bearer ${sessionStorage.getItem('token')}`,
           },
         });
-        console.log('Fetched Doctors:', response.data);
-        
         setDoctors(response.data);
         setFilteredDoctors(response.data);
       } catch (err) {
@@ -245,17 +244,41 @@ const DoctorTable: React.FC = () => {
     setImagePreview(null);
   };
 
+  const handleDeleteClick = (doctorId: number) => {
+    setDoctorToDelete(doctorId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!doctorToDelete) return;
+
+    setDeleting(true);
+    try {
+      await axios.delete(`https://www.ss.mastersclinics.com/doctors/${doctorToDelete}`, {
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem('token')}`,
+        },
+      });
+
+      setDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
+      setFilteredDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
+      
+      setDeleteDialogOpen(false);
+    } catch (err) {
+      setError('فشل في حذف الطبيب');
+      console.error(err);
+    } finally {
+      setDeleting(false);
+      setDoctorToDelete(null);
+    }
+  };
+
   const getBranchName = (id: number) => {
     const branch = branchOptions.find(b => b.id === id);
     return branch ? branch.name : id.toString();
   };
 
   const getDepartmentName = (id: number) => {
-
-    console.log('Department ID:', id);
-    
-    console.log(departmentOptions);
-    
     const dept = departmentOptions.find(d => d.id === id);
     return dept ? dept.name : '-';
   };
@@ -317,9 +340,17 @@ const DoctorTable: React.FC = () => {
                   <TableCell align="center">{doctor.phone || '-'}</TableCell>
                   <TableCell align="center">{doctor.email || '-'}</TableCell>
                   <TableCell align="center">
-                    <Link to={`/doctors/${doctor.id}`}>
-                      <Button variant="outlined" size="small">عرض</Button>
-                    </Link>
+                    <Stack direction="row" spacing={1} justifyContent="center">
+                      <Link to={`/doctors/${doctor.id}`}>
+                        <Button variant="outlined" size="small">عرض</Button>
+                      </Link>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleDeleteClick(doctor.id)}
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))
@@ -332,228 +363,257 @@ const DoctorTable: React.FC = () => {
         </Table>
       </TableContainer>
 
-  <Dialog 
-  open={openAddDialog} 
-  onClose={() => {
-    setOpenAddDialog(false);
-    resetForm();
-  }} 
-  fullWidth 
-  maxWidth="md"
->
-  <DialogTitle>إضافة طبيب جديد</DialogTitle>
-  <DialogContent dividers>
-    <Stack spacing={3} sx={{ pt: 2 }}>
-      <TextField
-        label="الاسم *"
-        name="name"
-        value={newDoctor.name}
-        onChange={handleInputChange}
-        fullWidth
-      />
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>تأكيد الحذف</DialogTitle>
+        <DialogContent>
+          <Typography>هل أنت متأكد من رغبتك في حذف هذا الطبيب؟</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)}
+            color="primary"
+            disabled={deleting}
+          >
+            إلغاء
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={20} /> : null}
+          >
+            {deleting ? 'جاري الحذف...' : 'حذف'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      <TextField
-        label="اللقب"
-        name="title"
-        value={newDoctor.title}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="الوصف"
-        name="description"
-        value={newDoctor.description}
-        onChange={handleInputChange}
-        multiline
-        rows={3}
-        fullWidth
-      />
-
-      <TextField
-        label="المنصب"
-        name="position"
-        value={newDoctor.position}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="التخصص"
-        name="practice_area"
-        value={newDoctor.practice_area}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="الخبرة"
-        name="experience"
-        value={newDoctor.experience}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="العنوان"
-        name="address"
-        value={newDoctor.address}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="الهاتف"
-        name="phone"
-        value={newDoctor.phone}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="البريد الإلكتروني"
-        name="email"
-        value={newDoctor.email}
-        onChange={handleInputChange}
-        fullWidth
-      />
-
-      <TextField
-        label="الخبرة الشخصية"
-        name="personal_experience"
-        value={newDoctor.personal_experience}
-        onChange={handleInputChange}
-        multiline
-        rows={3}
-        fullWidth
-      />
-
-      <TextField
-        label="التعليم (مفصولة بفاصلة)"
-        value={newDoctor.education?.join(', ') || ''}
-        onChange={(e) => handleListChange('education', e.target.value)}
-        fullWidth
-      />
-
-      <TextField
-        label="المهارات (مفصولة بفاصلة)"
-        value={newDoctor.skills?.join(', ') || ''}
-        onChange={(e) => handleListChange('skills', e.target.value)}
-        fullWidth
-      />
-
-      <TextField
-        label="الإنجازات (مفصولة بفاصلة)"
-        value={newDoctor.achievements?.join(', ') || ''}
-        onChange={(e) => handleListChange('achievements', e.target.value)}
-        fullWidth
-      />
-
-      <Box>
-        <Typography variant="subtitle1" gutterBottom>
-          الفروع
-        </Typography>
-        <TextField
-          select
-          SelectProps={{
-            multiple: true,
-            value: newDoctor.branches_ids || [],
-            onChange: (e) => {
-              const value = e.target.value as number[];
-              setNewDoctor(prev => ({ ...prev, branches_ids: value }));
-            },
-            renderValue: (selected) => {
-              const selectedBranches = selected as number[];
-              return selectedBranches.map(id => getBranchName(id)).join(', ');
-            },
-          }}
-          fullWidth
-        >
-          {branchOptions.map((branch) => (
-            <MenuItem key={branch.id} value={branch.id}>
-              <Checkbox checked={newDoctor.branches_ids?.includes(branch.id) || false} />
-              {branch.name}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle1" gutterBottom>
-          القسم
-        </Typography>
-        <TextField
-          select
-          value={newDoctor.department_id || ''}
-          onChange={(e) => setNewDoctor(prev => ({
-            ...prev,
-            department_id: parseInt(e.target.value as string)
-          }))}
-          fullWidth
-        >
-          {departmentOptions.map((dept) => (
-            <MenuItem key={dept.id} value={dept.id}>
-              {dept.name}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle1" gutterBottom>
-          صورة الملف الشخصي
-        </Typography>
-        <Button
-          variant="outlined"
-          component="label"
-          fullWidth
-        >
-          تحميل صورة
-          <input
-            type="file"
-            hidden
-            accept="image/*"
-            onChange={handleFileChange}
-          />
-        </Button>
-        {imagePreview && (
-          <Box mt={2} textAlign="center">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              style={{
-                maxHeight: '200px',
-                maxWidth: '100%',
-                borderRadius: '4px'
-              }}
+      {/* Add Doctor Dialog */}
+      <Dialog 
+        open={openAddDialog} 
+        onClose={() => {
+          setOpenAddDialog(false);
+          resetForm();
+        }} 
+        fullWidth 
+        maxWidth="md"
+      >
+        <DialogTitle>إضافة طبيب جديد</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={3} sx={{ pt: 2 }}>
+            <TextField
+              label="الاسم *"
+              name="name"
+              value={newDoctor.name}
+              onChange={handleInputChange}
+              fullWidth
             />
-          </Box>
-        )}
-      </Box>
-    </Stack>
-  </DialogContent>
-  <DialogActions>
-    <Button 
-      onClick={() => {
-        setOpenAddDialog(false);
-        resetForm();
-      }}
-      color="secondary"
-    >
-      إلغاء
-    </Button>
-    <Button
-      onClick={handleSubmit}
-      variant="contained"
-      color="primary"
-      disabled={submitting || !newDoctor.name}
-      startIcon={submitting ? <CircularProgress size={20} /> : <Save />}
-    >
-      {submitting ? 'جاري الحفظ...' : 'حفظ'}
-    </Button>
-  </DialogActions>
-</Dialog>
-   </Box>
+
+            <TextField
+              label="اللقب"
+              name="title"
+              value={newDoctor.title}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="الوصف"
+              name="description"
+              value={newDoctor.description}
+              onChange={handleInputChange}
+              multiline
+              rows={3}
+              fullWidth
+            />
+
+            <TextField
+              label="المنصب"
+              name="position"
+              value={newDoctor.position}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="التخصص"
+              name="practice_area"
+              value={newDoctor.practice_area}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="الخبرة"
+              name="experience"
+              value={newDoctor.experience}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="العنوان"
+              name="address"
+              value={newDoctor.address}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="الهاتف"
+              name="phone"
+              value={newDoctor.phone}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="البريد الإلكتروني"
+              name="email"
+              value={newDoctor.email}
+              onChange={handleInputChange}
+              fullWidth
+            />
+
+            <TextField
+              label="الخبرة الشخصية"
+              name="personal_experience"
+              value={newDoctor.personal_experience}
+              onChange={handleInputChange}
+              multiline
+              rows={3}
+              fullWidth
+            />
+
+            <TextField
+              label="التعليم (مفصولة بفاصلة)"
+              value={newDoctor.education?.join(', ') || ''}
+              onChange={(e) => handleListChange('education', e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="المهارات (مفصولة بفاصلة)"
+              value={newDoctor.skills?.join(', ') || ''}
+              onChange={(e) => handleListChange('skills', e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="الإنجازات (مفصولة بفاصلة)"
+              value={newDoctor.achievements?.join(', ') || ''}
+              onChange={(e) => handleListChange('achievements', e.target.value)}
+              fullWidth
+            />
+
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                الفروع
+              </Typography>
+              <TextField
+                select
+                SelectProps={{
+                  multiple: true,
+                  value: newDoctor.branches_ids || [],
+                  onChange: (e) => {
+                    const value = e.target.value as number[];
+                    setNewDoctor(prev => ({ ...prev, branches_ids: value }));
+                  },
+                  renderValue: (selected) => {
+                    const selectedBranches = selected as number[];
+                    return selectedBranches.map(id => getBranchName(id)).join(', ');
+                  },
+                }}
+                fullWidth
+              >
+                {branchOptions.map((branch) => (
+                  <MenuItem key={branch.id} value={branch.id}>
+                    <Checkbox checked={newDoctor.branches_ids?.includes(branch.id) || false} />
+                    {branch.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                القسم
+              </Typography>
+              <TextField
+                select
+                value={newDoctor.department_id || ''}
+                onChange={(e) => setNewDoctor(prev => ({
+                  ...prev,
+                  department_id: parseInt(e.target.value as string)
+                }))}
+                fullWidth
+              >
+                {departmentOptions.map((dept) => (
+                  <MenuItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                صورة الملف الشخصي
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                fullWidth
+              >
+                تحميل صورة
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+              </Button>
+              {imagePreview && (
+                <Box mt={2} textAlign="center">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    style={{
+                      maxHeight: '200px',
+                      maxWidth: '100%',
+                      borderRadius: '4px'
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setOpenAddDialog(false);
+              resetForm();
+            }}
+            color="secondary"
+          >
+            إلغاء
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            color="primary"
+            disabled={submitting || !newDoctor.name}
+            startIcon={submitting ? <CircularProgress size={20} /> : <Save />}
+          >
+            {submitting ? 'جاري الحفظ...' : 'حفظ'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

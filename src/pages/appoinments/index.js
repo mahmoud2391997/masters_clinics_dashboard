@@ -62,7 +62,13 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         const fetchData = async () => {
             setState(prev => ({ ...prev, loading: true, error: null }));
             try {
-                const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
+                const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+                    },
+                });
                 if (!response.ok)
                     throw new Error('Network error');
                 const data = await response.json();

@@ -98,11 +98,13 @@ const DoctorSingle: React.FC = () => {
           skills: parseArrayField(data.skills),
           achievements: parseArrayField(data.achievements),
           working_hours: data.working_hours || [],
-          branches_ids: Array.isArray(data.branches_ids) ? data.branches_ids :
-            (data.branches_ids ? JSON.parse(data.branches_ids) : []),
+         branches_ids: Array.isArray(data.branches_ids) ? data.branches_ids :
+  (data.branches_ids ? JSON.parse(data.branches_ids) : []),
+
           department_id: data.department_id || 0,
           image: data.image || null,
         };
+console.log(parsedDoctor);
 
         setDoctor(parsedDoctor);
         setForm(parsedDoctor);
@@ -157,24 +159,33 @@ const DoctorSingle: React.FC = () => {
     }));
   };
 
-  const handleSave = async () => {
-    try {
-      const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(form),
-      });
+ const handleSave = async () => {
+  try {
+    // Ensure branches_ids is always an array
+    const formData = {
+      ...form,
+      branches_ids: Array.isArray(form.branches_ids) ? form.branches_ids : [],
+      education: form.education || [],
+      skills: form.skills || [],
+      achievements: form.achievements || [],
+      working_hours: form.working_hours || []
+    };
 
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(formData),
+    });
 
-      setDoctor(form as Doctor);
-      setEditMode(false);
-      setSnackbar({ open: true, message: 'تم تحديث بيانات الطبيب بنجاح', severity: 'success' });
-    } catch (error) {
-      console.error('Error updating doctor:', error);
-      setSnackbar({ open: true, message: 'حدث خطأ أثناء تحديث بيانات الطبيب', severity: 'error' });
-    }
-  };
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
+    setDoctor(form as Doctor);
+    setEditMode(false);
+    setSnackbar({ open: true, message: 'تم تحديث بيانات الطبيب بنجاح', severity: 'success' });
+  } catch (error) {
+    console.error('Error updating doctor:', error);
+    setSnackbar({ open: true, message: 'حدث خطأ أثناء تحديث بيانات الطبيب', severity: 'error' });
+  }
+};
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">

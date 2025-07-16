@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { Table, TableContainer, TableHead, TableRow, TableCell, Paper, Box, TextField, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Stack, TableBody, Checkbox, MenuItem, LinearProgress, CircularProgress } from '@mui/material';
-import { Add, Save } from '@mui/icons-material';
+import { Table, TableContainer, TableHead, TableRow, TableCell, Paper, Box, TextField, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Stack, TableBody, Checkbox, MenuItem, LinearProgress, CircularProgress, IconButton } from '@mui/material';
+import { Add, Save, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 const DoctorTable = () => {
@@ -9,6 +9,9 @@ const DoctorTable = () => {
     const [filteredDoctors, setFilteredDoctors] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [openAddDialog, setOpenAddDialog] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [doctorToDelete, setDoctorToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const [newDoctor, setNewDoctor] = useState({
         name: '',
         title: '',
@@ -43,7 +46,6 @@ const DoctorTable = () => {
                         Authorization: `Bearer ${sessionStorage.getItem('token')}`,
                     },
                 });
-                console.log('Fetched Doctors:', response.data);
                 setDoctors(response.data);
                 setFilteredDoctors(response.data);
             }
@@ -170,17 +172,42 @@ const DoctorTable = () => {
         setImageFile(null);
         setImagePreview(null);
     };
+    const handleDeleteClick = (doctorId) => {
+        setDoctorToDelete(doctorId);
+        setDeleteDialogOpen(true);
+    };
+    const handleConfirmDelete = async () => {
+        if (!doctorToDelete)
+            return;
+        setDeleting(true);
+        try {
+            await axios.delete(`https://www.ss.mastersclinics.com/doctors/${doctorToDelete}`, {
+                headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem('token')}`,
+                },
+            });
+            setDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
+            setFilteredDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
+            setDeleteDialogOpen(false);
+        }
+        catch (err) {
+            setError('فشل في حذف الطبيب');
+            console.error(err);
+        }
+        finally {
+            setDeleting(false);
+            setDoctorToDelete(null);
+        }
+    };
     const getBranchName = (id) => {
         const branch = branchOptions.find(b => b.id === id);
         return branch ? branch.name : id.toString();
     };
     const getDepartmentName = (id) => {
-        console.log('Department ID:', id);
-        console.log(departmentOptions);
         const dept = departmentOptions.find(d => d.id === id);
         return dept ? dept.name : '-';
     };
-    return (_jsxs(Box, { dir: "rtl", className: "p-5", children: [_jsxs(Box, { display: "flex", gap: 2, mb: 2, children: [_jsx(TextField, { fullWidth: true, label: "\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0644\u0642\u0628 \u0623\u0648 \u0627\u0644\u062A\u062E\u0635\u0635", variant: "outlined", value: searchQuery, onChange: (e) => setSearchQuery(e.target.value) }), _jsx(Button, { variant: "contained", startIcon: _jsx(Add, {}), onClick: () => setOpenAddDialog(true), children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628" })] }), error && (_jsx(Box, { mb: 2, children: _jsx(Typography, { color: "error", children: error }) })), _jsx(TableContainer, { component: Paper, children: _jsxs(Table, { children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: "\u0627\u0644\u0627\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0644\u0642\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0645\u0646\u0635\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u062A\u062E\u0635\u0635" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0647\u0627\u062A\u0641" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsx(TableBody, { children: loading ? (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: _jsx(LinearProgress, {}) }) })) : filteredDoctors.length > 0 ? (filteredDoctors.map((doctor) => (_jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: doctor.name }), _jsx(TableCell, { align: "center", children: doctor.title || '-' }), _jsx(TableCell, { align: "center", children: doctor.position || '-' }), _jsx(TableCell, { align: "center", children: doctor.practice_area || '-' }), _jsx(TableCell, { align: "center", children: getDepartmentName(doctor.department_id) }), _jsx(TableCell, { align: "center", children: doctor.phone || '-' }), _jsx(TableCell, { align: "center", children: doctor.email || '-' }), _jsx(TableCell, { align: "center", children: _jsx(Link, { to: `/doctors/${doctor.id}`, children: _jsx(Button, { variant: "outlined", size: "small", children: "\u0639\u0631\u0636" }) }) })] }, doctor.id)))) : (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })) })] }) }), _jsxs(Dialog, { open: openAddDialog, onClose: () => {
+    return (_jsxs(Box, { dir: "rtl", className: "p-5", children: [_jsxs(Box, { display: "flex", gap: 2, mb: 2, children: [_jsx(TextField, { fullWidth: true, label: "\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0644\u0642\u0628 \u0623\u0648 \u0627\u0644\u062A\u062E\u0635\u0635", variant: "outlined", value: searchQuery, onChange: (e) => setSearchQuery(e.target.value) }), _jsx(Button, { variant: "contained", startIcon: _jsx(Add, {}), onClick: () => setOpenAddDialog(true), children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628" })] }), error && (_jsx(Box, { mb: 2, children: _jsx(Typography, { color: "error", children: error }) })), _jsx(TableContainer, { component: Paper, children: _jsxs(Table, { children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: "\u0627\u0644\u0627\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0644\u0642\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0645\u0646\u0635\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u062A\u062E\u0635\u0635" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0647\u0627\u062A\u0641" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsx(TableBody, { children: loading ? (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: _jsx(LinearProgress, {}) }) })) : filteredDoctors.length > 0 ? (filteredDoctors.map((doctor) => (_jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: doctor.name }), _jsx(TableCell, { align: "center", children: doctor.title || '-' }), _jsx(TableCell, { align: "center", children: doctor.position || '-' }), _jsx(TableCell, { align: "center", children: doctor.practice_area || '-' }), _jsx(TableCell, { align: "center", children: getDepartmentName(doctor.department_id) }), _jsx(TableCell, { align: "center", children: doctor.phone || '-' }), _jsx(TableCell, { align: "center", children: doctor.email || '-' }), _jsx(TableCell, { align: "center", children: _jsxs(Stack, { direction: "row", spacing: 1, justifyContent: "center", children: [_jsx(Link, { to: `/doctors/${doctor.id}`, children: _jsx(Button, { variant: "outlined", size: "small", children: "\u0639\u0631\u0636" }) }), _jsx(IconButton, { color: "error", onClick: () => handleDeleteClick(doctor.id), children: _jsx(Delete, {}) })] }) })] }, doctor.id)))) : (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })) })] }) }), _jsxs(Dialog, { open: deleteDialogOpen, onClose: () => setDeleteDialogOpen(false), children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Typography, { children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u0631\u063A\u0628\u062A\u0643 \u0641\u064A \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0628\u064A\u0628\u061F" }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => setDeleteDialogOpen(false), color: "primary", disabled: deleting, children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: handleConfirmDelete, color: "error", disabled: deleting, startIcon: deleting ? _jsx(CircularProgress, { size: 20 }) : null, children: deleting ? 'جاري الحذف...' : 'حذف' })] })] }), _jsxs(Dialog, { open: openAddDialog, onClose: () => {
                     setOpenAddDialog(false);
                     resetForm();
                 }, fullWidth: true, maxWidth: "md", children: [_jsx(DialogTitle, { children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628 \u062C\u062F\u064A\u062F" }), _jsx(DialogContent, { dividers: true, children: _jsxs(Stack, { spacing: 3, sx: { pt: 2 }, children: [_jsx(TextField, { label: "\u0627\u0644\u0627\u0633\u0645 *", name: "name", value: newDoctor.name, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0644\u0642\u0628", name: "title", value: newDoctor.title, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0648\u0635\u0641", name: "description", value: newDoctor.description, onChange: handleInputChange, multiline: true, rows: 3, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u0646\u0635\u0628", name: "position", value: newDoctor.position, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062A\u062E\u0635\u0635", name: "practice_area", value: newDoctor.practice_area, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062E\u0628\u0631\u0629", name: "experience", value: newDoctor.experience, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0639\u0646\u0648\u0627\u0646", name: "address", value: newDoctor.address, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0647\u0627\u062A\u0641", name: "phone", value: newDoctor.phone, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", name: "email", value: newDoctor.email, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062E\u0628\u0631\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629", name: "personal_experience", value: newDoctor.personal_experience, onChange: handleInputChange, multiline: true, rows: 3, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062A\u0639\u0644\u064A\u0645 (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.education?.join(', ') || '', onChange: (e) => handleListChange('education', e.target.value), fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u0647\u0627\u0631\u0627\u062A (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.skills?.join(', ') || '', onChange: (e) => handleListChange('skills', e.target.value), fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0625\u0646\u062C\u0627\u0632\u0627\u062A (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.achievements?.join(', ') || '', onChange: (e) => handleListChange('achievements', e.target.value), fullWidth: true }), _jsxs(Box, { children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0627\u0644\u0641\u0631\u0648\u0639" }), _jsx(TextField, { select: true, SelectProps: {

@@ -59,6 +59,7 @@ const DoctorSingle = () => {
                     department_id: data.department_id || 0,
                     image: data.image || null,
                 };
+                console.log(parsedDoctor);
                 setDoctor(parsedDoctor);
                 setForm(parsedDoctor);
             }
@@ -111,9 +112,18 @@ const DoctorSingle = () => {
     };
     const handleSave = async () => {
         try {
-            const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
+            // Ensure branches_ids is always an array
+            const formData = {
+                ...form,
+                branches_ids: Array.isArray(form.branches_ids) ? form.branches_ids : [],
+                education: form.education || [],
+                skills: form.skills || [],
+                achievements: form.achievements || [],
+                working_hours: form.working_hours || []
+            };
+            const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`, {
                 method: 'PUT',
-                body: JSON.stringify(form),
+                body: JSON.stringify(formData),
             });
             if (!res.ok)
                 throw new Error(`HTTP error! status: ${res.status}`);

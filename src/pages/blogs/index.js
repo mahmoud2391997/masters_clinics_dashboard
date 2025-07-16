@@ -28,6 +28,7 @@ const BlogsPage = () => {
         setError(null);
         try {
             const res = await axios.get("https://www.ss.mastersclinics.com/blogs");
+            console.log(res.data);
             setBlogs(res.data);
         }
         catch (error) {
