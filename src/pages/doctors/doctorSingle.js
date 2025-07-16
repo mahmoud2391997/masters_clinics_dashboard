@@ -121,7 +121,7 @@ const DoctorSingle = () => {
                 achievements: form.achievements || [],
                 working_hours: form.working_hours || []
             };
-            const res = await fetchWithAuth(`http://localhost:3000/doctors/${id}`, {
+            const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify(formData),
             });

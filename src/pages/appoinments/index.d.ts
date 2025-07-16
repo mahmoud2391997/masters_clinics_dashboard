@@ -18,7 +18,7 @@ interface Appointment {
     branch: string;
     createdAt: string;
     landingPageId: string;
-    utmSource: string;
+    utmSource?: string;
     doctor?: string;
     offer?: string;
     callLogs?: CallLog[];

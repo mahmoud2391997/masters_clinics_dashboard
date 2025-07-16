@@ -42,9 +42,10 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         editedLogNotes: '',
         deleteConfirmOpen: false,
         appointmentToDelete: null,
+        currentPage: 1,
+        totalPages: 1,
     });
-    const { search, branchFilter, loading, error, fetchedData, selectedAppointment, callLogDialogOpen, newCallLogStatus, newCallLogNotes, editingLogId, editedLogStatus, editedLogNotes, deleteConfirmOpen, appointmentToDelete, } = state;
-    // Use passed userRole or fallback to sessionStorage role
+    const { search, branchFilter, loading, error, fetchedData, selectedAppointment, callLogDialogOpen, newCallLogStatus, newCallLogNotes, editingLogId, editedLogStatus, editedLogNotes, deleteConfirmOpen, appointmentToDelete, currentPage, totalPages, } = state;
     const role = userRole || (sessionStorage.getItem("role") ?? 'customercare');
     const username = sessionStorage.getItem("username") || 'غير معروف';
     const fetchWithToken = async (url, options = {}) => {
@@ -58,33 +59,40 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             },
         });
     };
+    const fetchData = async () => {
+        setState(prev => ({ ...prev, loading: true, error: null }));
+        try {
+            const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`);
+            if (!response.ok)
+                throw new Error('Network error');
+            const data = await response.json();
+            setState(prev => ({
+                ...prev,
+                fetchedData: data.appointments || [],
+                totalPages: data.totalPages || 1,
+                loading: false,
+            }));
+        }
+        catch (err) {
+            setState(prev => ({ ...prev, error: 'فشل في تحميل البيانات', loading: false }));
+        }
+    };
     useEffect(() => {
-        const fetchData = async () => {
-            setState(prev => ({ ...prev, loading: true, error: null }));
-            try {
-                const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
-                    },
-                });
-                if (!response.ok)
-                    throw new Error('Network error');
-                const data = await response.json();
-                console.log('Fetched appointments:', data);
-                setState(prev => ({ ...prev, fetchedData: data, loading: false }));
-            }
-            catch (err) {
-                setState(prev => ({ ...prev, error: 'فشل في تحميل البيانات', loading: false }));
-            }
-        };
         fetchData();
-    }, []);
+    }, [currentPage]);
     const branchOptions = useMemo(() => {
         const branches = (fetchedData || []).map(d => d.branch).filter(Boolean);
         return Array.from(new Set(branches));
     }, [fetchedData]);
+    const hasUtmSource = useMemo(() => {
+        return fetchedData.some(row => !!row.utmSource);
+    }, [fetchedData]);
+    const visibleFormFields = useMemo(() => {
+        if (role === 'customercare' && !hasUtmSource) {
+            return formFields.filter(field => field.key !== 'utmSource');
+        }
+        return formFields;
+    }, [formFields, role, hasUtmSource]);
     const deepSearch = (obj, searchTerm) => {
         if (!obj)
             return false;
@@ -148,23 +156,22 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             };
             const updatedLogs = [...(selectedAppointment.callLogs || []), newLog];
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-            const data = await refreshed.json();
+            await fetchData(); // Refresh data after update
             setState(prev => ({
                 ...prev,
-                fetchedData: data,
                 newCallLogStatus: '',
                 newCallLogNotes: ''
             }));
         }
         catch (err) {
             console.error('Failed to add call log:', err);
+            setState(prev => ({ ...prev, error: 'فشل في إضافة سجل الاتصال' }));
         }
     };
     const startEditingLog = (log) => {
         setState(prev => ({
             ...prev,
-            editingLogId: log.id ?? null, // استخدم null وليس undefined
+            editingLogId: log.id ?? null,
             editedLogStatus: log.status,
             editedLogNotes: log.notes || ''
         }));
@@ -191,11 +198,9 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
                 }
                 : log);
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-            const data = await refreshed.json();
+            await fetchData(); // Refresh data after update
             setState(prev => ({
                 ...prev,
-                fetchedData: data,
                 editingLogId: null,
                 editedLogStatus: '',
                 editedLogNotes: ''
@@ -203,6 +208,7 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         }
         catch (err) {
             console.error('Failed to save edited call log:', err);
+            setState(prev => ({ ...prev, error: 'فشل في حفظ التعديلات' }));
         }
     };
     const deleteCallLog = async (logId) => {
@@ -211,15 +217,11 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         try {
             const updatedLogs = (selectedAppointment.callLogs || []).filter(log => log.id !== logId);
             await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-            const data = await refreshed.json();
-            setState(prev => ({
-                ...prev,
-                fetchedData: data,
-            }));
+            await fetchData(); // Refresh data after update
         }
         catch (err) {
             console.error('Failed to delete call log:', err);
+            setState(prev => ({ ...prev, error: 'فشل في حذف سجل الاتصال' }));
         }
     };
     const openDeleteConfirm = (appointmentId) => {
@@ -241,14 +243,8 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             return;
         try {
             await deleteAppointment(appointmentToDelete);
-            const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-            const data = await refreshed.json();
-            setState(prev => ({
-                ...prev,
-                fetchedData: data,
-                deleteConfirmOpen: false,
-                appointmentToDelete: null
-            }));
+            await fetchData(); // Refresh data after deletion
+            closeDeleteConfirm();
         }
         catch (err) {
             console.error('Failed to delete appointment:', err);
@@ -260,18 +256,15 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
             }));
         }
     };
-    // Custom render for doctor_offer column
-    const renderDoctorOffer = (row) => {
-        return (_jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 }, children: [row.doctor && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", row.doctor] })), row.offer && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", row.offer] })), !row.doctor && !row.offer && '-'] }));
-    };
-    return (_jsxs(_Fragment, { children: [_jsxs(Box, { sx: { mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }, children: [_jsx(TextField, { label: "\u0628\u062D\u062B", value: search, onChange: handleChange('search'), sx: { minWidth: 200 } }), _jsxs(TextField, { select: true, label: "\u0641\u0631\u0639", value: branchFilter, onChange: handleChange('branchFilter'), sx: { minWidth: 150 }, children: [_jsx(MenuItem, { value: "all", children: "\u0627\u0644\u0643\u0644" }), branchOptions.map(branch => (_jsx(MenuItem, { value: branch, children: branch }, branch)))] })] }), _jsx(TableContainer, { component: Paper, sx: { maxHeight: 500 }, children: _jsxs(Table, { stickyHeader: true, size: "small", "aria-label": "appointments table", children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [formFields.map(field => (_jsx(TableCell, { align: "left", children: field.label }, field.key))), _jsx(TableCell, { children: "\u0622\u062E\u0631 \u062D\u0627\u0644\u0629" }), _jsx(TableCell, { children: "\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644" }), role === 'mediabuyer' && _jsx(TableCell, { children: "\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsxs(TableBody, { children: [loading && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", children: "... \u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644" }) })), error && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", sx: { color: 'red' }, children: error }) })), !loading && filteredData.length === 0 && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: formFields.length + 3, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })), filteredData.map(row => {
+    const renderDoctorOffer = (row) => (_jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 }, children: [row.doctor && _jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", row.doctor] }), row.offer && _jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", row.offer] }), !row.doctor && !row.offer && '-'] }));
+    return (_jsxs(_Fragment, { children: [_jsxs(Box, { sx: { mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }, children: [_jsx(TextField, { label: "\u0628\u062D\u062B", value: search, onChange: handleChange('search'), sx: { minWidth: 200 } }), _jsxs(TextField, { select: true, label: "\u0641\u0631\u0639", value: branchFilter, onChange: handleChange('branchFilter'), sx: { minWidth: 150 }, children: [_jsx(MenuItem, { value: "all", children: "\u0627\u0644\u0643\u0644" }), branchOptions.map(branch => (_jsx(MenuItem, { value: branch, children: branch }, branch)))] })] }), _jsx(TableContainer, { component: Paper, sx: { maxHeight: 500 }, children: _jsxs(Table, { stickyHeader: true, size: "small", "aria-label": "appointments table", children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [visibleFormFields.map(field => (_jsx(TableCell, { align: "left", children: field.label }, field.key))), _jsx(TableCell, { children: "\u0622\u062E\u0631 \u062D\u0627\u0644\u0629" }), _jsx(TableCell, { children: "\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644" }), role === 'mediabuyer' && _jsx(TableCell, { children: "\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsxs(TableBody, { children: [loading && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: visibleFormFields.length + 3, align: "center", children: "... \u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644" }) })), error && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: visibleFormFields.length + 3, align: "center", sx: { color: 'red' }, children: error }) })), !loading && filteredData.length === 0 && (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: visibleFormFields.length + 3, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })), filteredData.map(row => {
                                     const lastCall = getLastCallStatus(row);
-                                    return (_jsxs(TableRow, { hover: true, children: [formFields.map(field => (_jsx(TableCell, { children: field.key === 'createdAt'
+                                    return (_jsxs(TableRow, { hover: true, children: [visibleFormFields.map(field => (_jsx(TableCell, { children: field.key === 'createdAt'
                                                     ? new Date(row[field.key]).toLocaleString('ar-EG')
                                                     : field.key === 'doctor_offer'
                                                         ? renderDoctorOffer(row)
                                                         : (row[field.key] ?? '-') }, field.key))), _jsx(TableCell, { children: lastCall ? (_jsx(Tooltip, { title: `${new Date(lastCall.timestamp).toLocaleString('ar-EG')} - ${lastCall.agentName}`, children: _jsx(Chip, { label: lastCall.status, color: statusColors[lastCall.status] || 'default', size: "small", variant: "outlined" }) })) : (_jsx(Chip, { label: "\u0644\u0627 \u064A\u0648\u062C\u062F", color: "default", size: "small", variant: "outlined" })) }), _jsx(TableCell, { children: _jsxs(Button, { variant: "outlined", size: "small", onClick: () => openCallLogDialog(row), sx: { mr: 1 }, children: ["\u0639\u0631\u0636 (", (row.callLogs?.length) || 0, ")"] }) }), role === 'mediabuyer' && (_jsx(TableCell, { children: _jsx(Button, { variant: "outlined", color: "error", size: "small", onClick: () => openDeleteConfirm(row.id), startIcon: _jsx(DeleteIcon, { fontSize: "small" }), children: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0639\u062F" }) }))] }, row.id));
-                                })] })] }) }), _jsxs(Dialog, { open: callLogDialogOpen, onClose: closeCallLogDialog, maxWidth: "sm", fullWidth: true, children: [_jsxs(DialogTitle, { children: [_jsxs(Box, { children: [_jsxs(Typography, { variant: "h6", children: ["\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644: ", selectedAppointment?.name, " - ", selectedAppointment?.phone] }), _jsxs(Box, { sx: { mt: 1 }, children: [selectedAppointment?.doctor && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", selectedAppointment.doctor] })), selectedAppointment?.offer && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", selectedAppointment.offer] }))] })] }), _jsx(IconButton, { "aria-label": "close", onClick: closeCallLogDialog, sx: { position: 'absolute', left: 8, top: 8 }, children: _jsx(CloseIcon, {}) })] }), _jsxs(DialogContent, { dividers: true, children: [_jsx(List, { dense: true, children: (selectedAppointment?.callLogs || []).map(log => (_jsx(ListItem, { alignItems: "flex-start", divider: true, children: editingLogId === log.id ? (_jsxs(Box, { sx: { width: '100%' }, children: [_jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: editedLogStatus, onChange: e => setState(prev => ({ ...prev, editedLogStatus: e.target.value })), fullWidth: true, margin: "dense", size: "small", children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: editedLogNotes, onChange: e => setState(prev => ({ ...prev, editedLogNotes: e.target.value })), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsxs(Box, { sx: { mt: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }, children: [_jsx(Button, { onClick: cancelEditing, size: "small", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { variant: "contained", onClick: saveEditedLog, size: "small", children: "\u062D\u0641\u0638" })] })] })) : (_jsxs(_Fragment, { children: [_jsx(ListItemText, { primary: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: log.status, color: statusColors[log.status] || 'default', size: "small" }), log.editedBy && (_jsxs(Typography, { variant: "caption", color: "text.secondary", children: ["(\u062A\u0645 \u0627\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0648\u0627\u0633\u0637\u0629: ", log.editedBy, ")"] }))] }), secondary: _jsxs(_Fragment, { children: [_jsx(Typography, { component: "span", variant: "body2", color: "text.primary", children: log.notes || 'لا توجد ملاحظات' }), _jsx("br", {}), _jsxs(Typography, { component: "span", variant: "caption", color: "text.secondary", children: [new Date(log.timestamp).toLocaleString('ar-EG'), " - \u0627\u0644\u0648\u0643\u064A\u0644: ", log.agentName || 'غير معروف'] })] }) }), (role === 'customercare' || role === 'admin') && (_jsxs(ListItemSecondaryAction, { children: [_jsx(Tooltip, { title: "\u062A\u0639\u062F\u064A\u0644", children: _jsx(IconButton, { edge: "end", "aria-label": "edit", onClick: () => startEditingLog(log), size: "small", children: _jsx(EditIcon, { fontSize: "small" }) }) }), _jsx(Tooltip, { title: "\u062D\u0630\u0641", children: _jsx(IconButton, { edge: "end", "aria-label": "delete", onClick: () => log.id && deleteCallLog(log.id), size: "small", children: _jsx(DeleteIcon, { fontSize: "small" }) }) })] }))] })) }, log.id))) }), (role === 'customercare' || role === 'admin') && (_jsxs(Box, { sx: { mt: 2, borderTop: '1px solid #eee', pt: 2 }, children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644 \u062C\u062F\u064A\u062F" }), _jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: newCallLogStatus, onChange: handleChange('newCallLogStatus'), fullWidth: true, margin: "dense", size: "small", required: true, children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: newCallLogNotes, onChange: handleChange('newCallLogNotes'), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsx(Button, { variant: "contained", startIcon: _jsx(AddIcon, {}), sx: { mt: 1 }, onClick: addNewCallLog, disabled: !newCallLogStatus, size: "small", children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644" })] }))] }), _jsx(DialogActions, { children: _jsx(Button, { onClick: closeCallLogDialog, size: "small", children: "\u0625\u063A\u0644\u0627\u0642" }) })] }), _jsxs(Dialog, { open: deleteConfirmOpen, onClose: closeDeleteConfirm, children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Alert, { severity: "warning", children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0623\u0646\u0643 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0639\u062F\u061F \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u062A\u0631\u0627\u062C\u0639 \u0639\u0646\u0647." }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: closeDeleteConfirm, color: "primary", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: confirmDeleteAppointment, color: "error", variant: "contained", children: "\u062D\u0630\u0641" })] })] })] }));
+                                })] })] }) }), _jsxs(Box, { sx: { mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }, children: [_jsx(Button, { variant: "outlined", disabled: currentPage === 1, onClick: () => setState(prev => ({ ...prev, currentPage: prev.currentPage - 1 })), size: "small", children: "\u0627\u0644\u0635\u0641\u062D\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629" }), _jsxs(Typography, { variant: "body2", sx: { alignSelf: 'center' }, children: ["\u0627\u0644\u0635\u0641\u062D\u0629 ", currentPage, " \u0645\u0646 ", totalPages] }), _jsx(Button, { variant: "outlined", disabled: currentPage === totalPages, onClick: () => setState(prev => ({ ...prev, currentPage: prev.currentPage + 1 })), size: "small", children: "\u0627\u0644\u0635\u0641\u062D\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629" })] }), _jsxs(Dialog, { open: callLogDialogOpen, onClose: closeCallLogDialog, maxWidth: "sm", fullWidth: true, children: [_jsxs(DialogTitle, { children: [_jsxs(Box, { children: [_jsxs(Typography, { variant: "h6", children: ["\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0627\u062A\u0635\u0627\u0644: ", selectedAppointment?.name, " - ", selectedAppointment?.phone] }), _jsxs(Box, { sx: { mt: 1 }, children: [selectedAppointment?.doctor && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0637\u0628\u064A\u0628: ", selectedAppointment.doctor] })), selectedAppointment?.offer && (_jsxs(Typography, { variant: "body2", children: ["\u0627\u0644\u0639\u0631\u0636: ", selectedAppointment.offer] }))] })] }), _jsx(IconButton, { "aria-label": "close", onClick: closeCallLogDialog, sx: { position: 'absolute', left: 8, top: 8 }, children: _jsx(CloseIcon, {}) })] }), _jsxs(DialogContent, { dividers: true, children: [_jsx(List, { dense: true, children: (selectedAppointment?.callLogs || []).map(log => (_jsx(ListItem, { alignItems: "flex-start", divider: true, children: editingLogId === log.id ? (_jsxs(Box, { sx: { width: '100%' }, children: [_jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: editedLogStatus, onChange: e => setState(prev => ({ ...prev, editedLogStatus: e.target.value })), fullWidth: true, margin: "dense", size: "small", children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: editedLogNotes, onChange: e => setState(prev => ({ ...prev, editedLogNotes: e.target.value })), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsxs(Box, { sx: { mt: 1, display: 'flex', gap: 1, justifyContent: 'flex-end' }, children: [_jsx(Button, { onClick: cancelEditing, size: "small", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { variant: "contained", onClick: saveEditedLog, size: "small", children: "\u062D\u0641\u0638" })] })] })) : (_jsxs(_Fragment, { children: [_jsx(ListItemText, { primary: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: log.status, color: statusColors[log.status] || 'default', size: "small" }), log.editedBy && (_jsxs(Typography, { variant: "caption", color: "text.secondary", children: ["(\u062A\u0645 \u0627\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0648\u0627\u0633\u0637\u0629: ", log.editedBy, ")"] }))] }), secondary: _jsxs(_Fragment, { children: [_jsx(Typography, { component: "span", variant: "body2", color: "text.primary", children: log.notes || 'لا توجد ملاحظات' }), _jsx("br", {}), _jsxs(Typography, { component: "span", variant: "caption", color: "text.secondary", children: [new Date(log.timestamp).toLocaleString('ar-EG', { timeZone: 'UTC' }), " - \u0627\u0644\u0648\u0643\u064A\u0644: ", log.agentName || 'غير معروف'] })] }) }), (role === 'customercare' || role === 'admin') && (_jsxs(ListItemSecondaryAction, { children: [_jsx(Tooltip, { title: "\u062A\u0639\u062F\u064A\u0644", children: _jsx(IconButton, { edge: "end", "aria-label": "edit", onClick: () => startEditingLog(log), size: "small", children: _jsx(EditIcon, { fontSize: "small" }) }) }), _jsx(Tooltip, { title: "\u062D\u0630\u0641", children: _jsx(IconButton, { edge: "end", "aria-label": "delete", onClick: () => log.id && deleteCallLog(log.id), size: "small", children: _jsx(DeleteIcon, { fontSize: "small" }) }) })] }))] })) }, log.id))) }), (role === 'customercare' || role === 'admin') && (_jsxs(Box, { sx: { mt: 2, borderTop: '1px solid #eee', pt: 2 }, children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644 \u062C\u062F\u064A\u062F" }), _jsx(TextField, { select: true, label: "\u0627\u0644\u062D\u0627\u0644\u0629", value: newCallLogStatus, onChange: handleChange('newCallLogStatus'), fullWidth: true, margin: "dense", size: "small", required: true, children: statusOptions.map(status => (_jsx(MenuItem, { value: status, children: _jsxs(Box, { display: "flex", alignItems: "center", gap: 1, children: [_jsx(Chip, { label: status, color: statusColors[status] || 'default', size: "small", sx: { mr: 1 } }), status] }) }, status))) }), _jsx(TextField, { label: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A", value: newCallLogNotes, onChange: handleChange('newCallLogNotes'), fullWidth: true, multiline: true, rows: 2, margin: "dense", size: "small" }), _jsx(Button, { variant: "contained", startIcon: _jsx(AddIcon, {}), sx: { mt: 1 }, onClick: addNewCallLog, disabled: !newCallLogStatus, size: "small", children: "\u0625\u0636\u0627\u0641\u0629 \u0633\u062C\u0644" })] }))] }), _jsx(DialogActions, { children: _jsx(Button, { onClick: closeCallLogDialog, size: "small", children: "\u0625\u063A\u0644\u0627\u0642" }) })] }), _jsxs(Dialog, { open: deleteConfirmOpen, onClose: closeDeleteConfirm, children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Alert, { severity: "warning", children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0623\u0646\u0643 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0639\u062F\u061F \u0647\u0630\u0627 \u0627\u0644\u0625\u062C\u0631\u0627\u0621 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u062A\u0631\u0627\u062C\u0639 \u0639\u0646\u0647." }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: closeDeleteConfirm, color: "primary", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: confirmDeleteAppointment, color: "error", variant: "contained", children: "\u062D\u0630\u0641" })] })] })] }));
 };
 const defaultFormFields = [
     { key: "name", label: "الاسم" },

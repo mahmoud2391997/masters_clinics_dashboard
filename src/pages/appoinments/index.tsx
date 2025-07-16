@@ -33,7 +33,7 @@ interface Appointment {
   branch: string;
   createdAt: string;
   landingPageId: string;
-  utmSource: string;
+  utmSource?: string;
   doctor?: string;
   offer?: string;
   callLogs?: CallLog[];
@@ -64,6 +64,8 @@ interface State {
   editedLogNotes: string;
   deleteConfirmOpen: boolean;
   appointmentToDelete: string | null;
+  currentPage: number;
+  totalPages: number;
 }
 
 const statusColors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
@@ -108,6 +110,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     editedLogNotes: '',
     deleteConfirmOpen: false,
     appointmentToDelete: null,
+    currentPage: 1,
+    totalPages: 1,
   });
 
   const {
@@ -116,9 +120,9 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     newCallLogStatus, newCallLogNotes,
     editingLogId, editedLogStatus, editedLogNotes,
     deleteConfirmOpen, appointmentToDelete,
+    currentPage, totalPages,
   } = state;
 
-  // Use passed userRole or fallback to sessionStorage role
   const role = userRole || (sessionStorage.getItem("role") ?? 'customercare');
   const username = sessionStorage.getItem("username") || 'غير معروف';
 
@@ -134,27 +138,42 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     });
   };
 
+  const fetchData = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`);
+      if (!response.ok) throw new Error('Network error');
+      const data = await response.json();
+      setState(prev => ({
+        ...prev,
+        fetchedData: data.appointments || [],
+        totalPages: data.totalPages || 1,
+        loading: false,
+      }));
+    } catch (err) {
+      setState(prev => ({ ...prev, error: 'فشل في تحميل البيانات', loading: false }));
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      try {
-        const response = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-        if (!response.ok) throw new Error('Network error');
-        const data = await response.json();
-        console.log('Fetched appointments:', data);
-        
-        setState(prev => ({ ...prev, fetchedData: data, loading: false }));
-      } catch (err) {
-        setState(prev => ({ ...prev, error: 'فشل في تحميل البيانات', loading: false }));
-      }
-    };
     fetchData();
-  }, []);
+  }, [currentPage]);
 
   const branchOptions = useMemo(() => {
     const branches = (fetchedData || []).map(d => d.branch).filter(Boolean);
     return Array.from(new Set(branches));
   }, [fetchedData]);
+
+  const hasUtmSource = useMemo(() => {
+    return fetchedData.some(row => !!row.utmSource);
+  }, [fetchedData]);
+
+  const visibleFormFields = useMemo(() => {
+    if (role === 'customercare' && !hasUtmSource) {
+      return formFields.filter(field => field.key !== 'utmSource');
+    }
+    return formFields;
+  }, [formFields, role, hasUtmSource]);
 
   const deepSearch = (obj: any, searchTerm: string): boolean => {
     if (!obj) return false;
@@ -224,32 +243,29 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       };
 
       const updatedLogs = [...(selectedAppointment.callLogs || []), newLog];
-
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-      const data = await refreshed.json();
+      await fetchData(); // Refresh data after update
 
       setState(prev => ({
         ...prev,
-        fetchedData: data,
         newCallLogStatus: '',
         newCallLogNotes: ''
       }));
     } catch (err) {
       console.error('Failed to add call log:', err);
+      setState(prev => ({ ...prev, error: 'فشل في إضافة سجل الاتصال' }));
     }
   };
 
-const startEditingLog = (log: CallLog) => {
-  setState(prev => ({
-    ...prev,
-    editingLogId: log.id ?? null,  // استخدم null وليس undefined
-    editedLogStatus: log.status,
-    editedLogNotes: log.notes || ''
-  }));
-};
-
+  const startEditingLog = (log: CallLog) => {
+    setState(prev => ({
+      ...prev,
+      editingLogId: log.id ?? null,
+      editedLogStatus: log.status,
+      editedLogNotes: log.notes || ''
+    }));
+  };
 
   const cancelEditing = () => {
     setState(prev => ({
@@ -278,18 +294,17 @@ const startEditingLog = (log: CallLog) => {
 
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-      const data = await refreshed.json();
+      await fetchData(); // Refresh data after update
 
       setState(prev => ({
         ...prev,
-        fetchedData: data,
         editingLogId: null,
         editedLogStatus: '',
         editedLogNotes: ''
       }));
     } catch (err) {
       console.error('Failed to save edited call log:', err);
+      setState(prev => ({ ...prev, error: 'فشل في حفظ التعديلات' }));
     }
   };
 
@@ -300,15 +315,10 @@ const startEditingLog = (log: CallLog) => {
       const updatedLogs = (selectedAppointment.callLogs || []).filter(log => log.id !== logId);
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs });
 
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-      const data = await refreshed.json();
-
-      setState(prev => ({
-        ...prev,
-        fetchedData: data,
-      }));
+      await fetchData(); // Refresh data after update
     } catch (err) {
       console.error('Failed to delete call log:', err);
+      setState(prev => ({ ...prev, error: 'فشل في حذف سجل الاتصال' }));
     }
   };
 
@@ -333,15 +343,8 @@ const startEditingLog = (log: CallLog) => {
 
     try {
       await deleteAppointment(appointmentToDelete);
-      const refreshed = await fetchWithToken('https://www.ss.mastersclinics.com/appointments');
-     
-      const data = await refreshed.json();
-      setState(prev => ({
-        ...prev,
-        fetchedData: data,
-        deleteConfirmOpen: false,
-        appointmentToDelete: null
-      }));
+      await fetchData(); // Refresh data after deletion
+      closeDeleteConfirm();
     } catch (err) {
       console.error('Failed to delete appointment:', err);
       setState(prev => ({
@@ -353,24 +356,13 @@ const startEditingLog = (log: CallLog) => {
     }
   };
 
-  // Custom render for doctor_offer column
-  const renderDoctorOffer = (row: Appointment) => {
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        {row.doctor && (
-          <Typography variant="body2">
-            الطبيب: {row.doctor}
-          </Typography>
-        )}
-        {row.offer && (
-          <Typography variant="body2">
-            العرض: {row.offer}
-          </Typography>
-        )}
-        {!row.doctor && !row.offer && '-'}
-      </Box>
-    );
-  };
+  const renderDoctorOffer = (row: Appointment) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      {row.doctor && <Typography variant="body2">الطبيب: {row.doctor}</Typography>}
+      {row.offer && <Typography variant="body2">العرض: {row.offer}</Typography>}
+      {!row.doctor && !row.offer && '-'}
+    </Box>
+  );
 
   return (
     <>
@@ -399,7 +391,7 @@ const startEditingLog = (log: CallLog) => {
         <Table stickyHeader size="small" aria-label="appointments table">
           <TableHead>
             <TableRow>
-              {formFields.map(field => (
+              {visibleFormFields.map(field => (
                 <TableCell key={field.key} align="left">{field.label}</TableCell>
               ))}
               <TableCell>آخر حالة</TableCell>
@@ -410,24 +402,24 @@ const startEditingLog = (log: CallLog) => {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={formFields.length + 3} align="center">... جاري التحميل</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 3} align="center">... جاري التحميل</TableCell>
               </TableRow>
             )}
             {error && (
               <TableRow>
-                <TableCell colSpan={formFields.length + 3} align="center" sx={{ color: 'red' }}>{error}</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 3} align="center" sx={{ color: 'red' }}>{error}</TableCell>
               </TableRow>
             )}
             {!loading && filteredData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={formFields.length + 3} align="center">لا توجد بيانات</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 3} align="center">لا توجد بيانات</TableCell>
               </TableRow>
             )}
             {filteredData.map(row => {
               const lastCall = getLastCallStatus(row);
               return (
                 <TableRow key={row.id} hover>
-                  {formFields.map(field => (
+                  {visibleFormFields.map(field => (
                     <TableCell key={field.key}>
                       {field.key === 'createdAt'
                         ? new Date(row[field.key]).toLocaleString('ar-EG')
@@ -480,6 +472,30 @@ const startEditingLog = (log: CallLog) => {
         </Table>
       </TableContainer>
 
+      {/* Pagination Controls */}
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
+        <Button
+          variant="outlined"
+          disabled={currentPage === 1}
+          onClick={() => setState(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
+          size="small"
+        >
+          الصفحة السابقة
+        </Button>
+        <Typography variant="body2" sx={{ alignSelf: 'center' }}>
+          الصفحة {currentPage} من {totalPages}
+        </Typography>
+        <Button
+          variant="outlined"
+          disabled={currentPage === totalPages}
+          onClick={() => setState(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
+          size="small"
+        >
+          الصفحة التالية
+        </Button>
+      </Box>
+
+      {/* Call Log Dialog */}
       <Dialog open={callLogDialogOpen} onClose={closeCallLogDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           <Box>
@@ -569,7 +585,8 @@ const startEditingLog = (log: CallLog) => {
                           </Typography>
                           <br />
                           <Typography component="span" variant="caption" color="text.secondary">
-                            {new Date(log.timestamp).toLocaleString('ar-EG')} - الوكيل: {log.agentName || 'غير معروف'}
+                            {new Date(log.timestamp).toLocaleString('ar-EG', { timeZone: 'UTC' })
+} - الوكيل: {log.agentName || 'غير معروف'}
                           </Typography>
                         </>
                       }
@@ -582,8 +599,7 @@ const startEditingLog = (log: CallLog) => {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="حذف">
-                          <IconButton edge="end" aria-label="delete" onClick={() => log.id && deleteCallLog(log.id)}
- size="small">
+                          <IconButton edge="end" aria-label="delete" onClick={() => log.id && deleteCallLog(log.id)} size="small">
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -650,6 +666,7 @@ const startEditingLog = (log: CallLog) => {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onClose={closeDeleteConfirm}>
         <DialogTitle>تأكيد الحذف</DialogTitle>
         <DialogContent>
@@ -676,7 +693,6 @@ const defaultFormFields: FormField[] = [
   { key: "pageCreator", label: "منشئ الصفحة" },
   { key: "pageTitle", label: "عنوان الصفحة" },
   { key: "utmSource", label: "المصدر" },
-
   { key: "createdAt", label: "تاريخ الإنشاء" }
 ];
 
