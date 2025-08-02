@@ -14,7 +14,9 @@ import {
   Image,
   ConfigProvider,
   Row,
-  Col
+  Col,
+  Checkbox,
+  Tag
 } from "antd";
 import { UploadOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { getBranches } from "../../api/regions&branches";
@@ -30,7 +32,7 @@ const arabicText = {
   deviceImage: "صورة الجهاز",
   deviceName: "اسم الجهاز",
   deviceType: "نوع الجهاز",
-  branch: "الفرع",
+  branches: "الفروع",
   availableTimes: "مواعيد العمل",
   actions: "الإجراءات",
   addDevice: "إضافة جهاز",
@@ -41,7 +43,7 @@ const arabicText = {
   deleteConfirmMessage: "هل أنت متأكد من رغبتك في حذف هذا الجهاز؟",
   deviceNameRequired: "يرجى إدخال اسم الجهاز!",
   deviceTypeRequired: "يرجى اختيار نوع الجهاز!",
-  branchRequired: "يرجى اختيار الفرع!",
+  branchesRequired: "يرجى اختيار فرع واحد على الأقل!",
   operationFailed: "فشلت العملية",
   deviceAdded: "تم إضافة الجهاز بنجاح",
   deviceUpdated: "تم تحديث الجهاز بنجاح",
@@ -51,31 +53,33 @@ const arabicText = {
   medicalDevices: "الأجهزة الطبية",
   cancel: "إلغاء",
   ok: "موافق",
+  active: "نشط",
+  inactive: "غير نشط",
+  priority: "الأولوية",
 };
 
 const deviceTypes = [
-  "ليزر ازالة الشعر",
-  "ليزر ازالة الشعر (تشقير)",
-  "اجهزة تنظيف البشرة",
-  "اجهزة التغذية ونحت القوام",
-  "اجهزة معالجة البشرة",
-  "اجهزة التجميل النسائي"
+  "ليزر إزالة الشعر",
+  "ليزر إزالة الشعر (تشقير)",
+  "أجهزة تنظيف البشرة",
+  "أجهزة التغذية ونحت القوام",
+  "أجهزة معالجة البشرة",
+  "أجهزة التجميل النسائي"
 ];
+
 interface Device {
   id: number;
   _id: string;
   name: string;
   type: string;
-  branch_id: number;
-  available_times?: string;
-  doctor_id?: number | null;
+  branches_ids: string;
+  available_times?: string | null;
   image_url?: string | null;
-  is_active?: boolean;
-  priority?: number;
+  priority: number;
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }
-
 
 interface Branch {
   id: number;
@@ -108,22 +112,13 @@ const MedicalDevicesPage: React.FC = () => {
           getDevices(),
           getBranches(),
         ]);
-        console.log(branchesResponse);
         
-        // Transform devices data to match our interface
-        const devicesData = (devicesResponse as unknown as Device[]).map(device => ({
-          ...device,
-          _id: device._id || device.id.toString(),
-          branch_id: Number(device.branch_id),
-        }));
-
-        // Transform branches data
         const branchesData = (branchesResponse.data as unknown as Branch[]).map(branch => ({
           ...branch,
           id: Number(branch.id),
         }));
 
-        setDevices(devicesData);
+        setDevices(devicesResponse as unknown as Device[]);
         setBranches(branchesData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -134,6 +129,17 @@ const MedicalDevicesPage: React.FC = () => {
     };
     fetchData();
   }, []);
+
+  const parseBranchesIds = (branchesString: string): number[] => {
+    try {
+      // Remove brackets and parse the string to array
+      const cleanedString = branchesString.replace(/[\[\]]/g, '');
+      return cleanedString.split(',').map(id => parseInt(id.trim()));
+    } catch (error) {
+      console.error("Error parsing branches_ids:", error);
+      return [];
+    }
+  };
 
   const handleBeforeUpload = (file: File) => {
     const isImage = file.type.startsWith("image/");
@@ -174,16 +180,22 @@ const MedicalDevicesPage: React.FC = () => {
 
   const handleEdit = (device: Device) => {
     setEditingDevice(device);
-  form.setFieldsValue({
-  name: device.name,
-  type: device.type,
-  branch_id: device.branch_id,
-  available_times: device.available_times,
-  priority: device.priority ?? 0,
-  is_active: device.is_active ?? true,
-});
-
-    setImagePreview(device.image_url || "");
+    const branchIds = parseBranchesIds(device.branches_ids);
+    
+    form.setFieldsValue({
+      name: device.name,
+      type: device.type,
+      branches_ids: branchIds,
+      available_times: device.available_times,
+      priority: device.priority,
+      is_active: device.is_active,
+    });
+    
+    if (device.image_url) {
+      setImagePreview(getImageUrl(device.image_url));
+    } else {
+      setImagePreview("");
+    }
     setIsModalVisible(true);
   };
 
@@ -217,9 +229,12 @@ const MedicalDevicesPage: React.FC = () => {
       formData.append("name", values.name);
       formData.append("type", values.type);
       formData.append("priority", values.priority?.toString() || "0");
-formData.append("is_active", values.is_active ? "true" : "false");
-
-      formData.append("branch_id", values.branch_id.toString());
+      formData.append("is_active", values.is_active ? "true" : "false");
+      
+      // Convert branches array to string format like "[1,2,3]"
+      const branchesString = `[${values.branches_ids.join(',')}]`;
+      formData.append("branches_ids", branchesString);
+      
       formData.append("available_times", values.available_times || "");
 
       if (fileList.length > 0 && fileList[0].originFileObj) {
@@ -254,7 +269,16 @@ formData.append("is_active", values.is_active ? "true" : "false");
       dataIndex: "image_url",
       key: "image",
       render: (url: string | null) =>
-        url ? <Image src={ getImageUrl(url) } alt="device" width={50} height={50} style={{ objectFit: "cover" }} /> : "-",
+        url ? (
+          <Image 
+            src={getImageUrl(url)} 
+            alt="device" 
+            width={50} 
+            height={50} 
+            style={{ objectFit: "cover" }} 
+            preview={false}
+          />
+        ) : "-",
     },
     {
       title: arabicText.deviceName,
@@ -267,32 +291,38 @@ formData.append("is_active", values.is_active ? "true" : "false");
       key: "type",
     },
     {
-  title: "الأولوية",
-  dataIndex: "priority",
-  key: "priority",
-  render: (val: number) => val ?? "-",
-},
-{
-  title: "نشط؟",
-  dataIndex: "is_active",
-  key: "is_active",
-  render: (val: boolean) => (val ? "نعم" : "لا"),
-},
-
+      title: arabicText.priority,
+      dataIndex: "priority",
+      key: "priority",
+      render: (val: number) => val ?? "-",
+    },
     {
-      title: arabicText.branch,
-      dataIndex: "branch_id",
-      key: "branch",
-      render: (branchId: number) => {
-        const branch = branches.find(b => b.id === branchId);
-        return branch ? branch.name : branchId.toString();
+      title: "الحالة",
+      dataIndex: "is_active",
+      key: "is_active",
+      render: (val: boolean) => (
+        <Tag color={val ? "green" : "red"}>
+          {val ? arabicText.active : arabicText.inactive}
+        </Tag>
+      ),
+    },
+    {
+      title: arabicText.branches,
+      dataIndex: "branches_ids",
+      key: "branches",
+      render: (branchesString: string) => {
+        const branchIds = parseBranchesIds(branchesString);
+        return branchIds.map(id => {
+          const branch = branches.find(b => b.id === id);
+          return branch ? branch.name : id;
+        }).join(", ");
       }
     },
     {
       title: arabicText.availableTimes,
       dataIndex: "available_times",
       key: "available_times",
-      render: (times: string | undefined) => times || "-",
+      render: (times: string | undefined | null) => times || "-",
     },
     {
       title: arabicText.actions,
@@ -335,6 +365,7 @@ formData.append("is_active", values.is_active ? "true" : "false");
           bordered
           loading={loading}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: true }}
         />
 
         <Modal
@@ -372,61 +403,79 @@ formData.append("is_active", values.is_active ? "true" : "false");
                 </Form.Item>
               </Col>
             </Row>
-<Row gutter={16}>
-  <Col span={12}>
-    <Form.Item label="الأولوية" name="priority">
-      <Input type="number" placeholder="مثال: 1 (أعلى أولوية)" />
-    </Form.Item>
-  </Col>
-  <Col span={12}>
-    <Form.Item label="نشط؟" name="is_active" valuePropName="checked">
-      <Select>
-        <Option value={true}>نعم</Option>
-        <Option value={false}>لا</Option>
-      </Select>
-    </Form.Item>
-  </Col>
-</Row>
-
             <Row gutter={16}>
               <Col span={12}>
+                <Form.Item label={arabicText.priority} name="priority">
+                  <Input type="number" placeholder="مثال: 1 (أعلى أولوية)" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="الحالة" name="is_active" valuePropName="checked">
+                  <Checkbox>{arabicText.active}</Checkbox>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={24}>
                 <Form.Item
-                  label={arabicText.branch}
-                  name="branch_id"
-                  rules={[{ required: true, message: arabicText.branchRequired }]}
+                  label={arabicText.branches}
+                  name="branches_ids"
+                  rules={[{ required: true, message: arabicText.branchesRequired }]}
                 >
-                  <Select placeholder={arabicText.branch}>
+                  <Select 
+                    mode="multiple"
+                    placeholder={arabicText.branches}
+                    showSearch
+                    optionFilterProp="children"
+                    filterOption={(input, option) =>
+                      (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                    }
+                  >
                     {branches.map(branch => (
                       <Option key={branch.id} value={branch.id}>{branch.name}</Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
-              <Col span={12}>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={24}>
                 <Form.Item
                   label={arabicText.availableTimes}
                   name="available_times"
                 >
-                  <TextArea rows={2} placeholder="مثال: السبت (1 ظ - 10م), الأحد (9:30 ص-10م)" />
+                  <TextArea 
+                    rows={3} 
+                    placeholder="مثال: السبت (2 ظ - 10م), الأحد (9:30 ص _ 2 م ) & ( 6:30 م _ 10م), الخميس (9:30 ص -7م)" 
+                  />
                 </Form.Item>
               </Col>
             </Row>
 
-            <Form.Item label={arabicText.uploadImage}>
+            <Form.Item label={arabicText.deviceImage}>
               <Upload
-                listType="picture"
+                listType="picture-card"
                 fileList={fileList}
                 beforeUpload={handleBeforeUpload}
                 onChange={handleImageChange}
                 maxCount={1}
+                accept="image/*"
               >
-                <Button icon={<UploadOutlined />}>{arabicText.uploadImage}</Button>
+                {fileList.length >= 1 ? null : (
+                  <div>
+                    <UploadOutlined />
+                    <div style={{ marginTop: 8 }}>{arabicText.uploadImage}</div>
+                  </div>
+                )}
               </Upload>
               {imagePreview && (
                 <Image
                   src={imagePreview}
                   alt="Preview"
                   style={{ marginTop: 8, maxHeight: 150 }}
+                  preview={false}
                 />
               )}
             </Form.Item>

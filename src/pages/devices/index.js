@@ -1,7 +1,7 @@
 "use client";
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useEffect, useState } from "react";
-import { Table, Space, Button, Modal, Form, Input, Select, Upload, message, Image, ConfigProvider, Row, Col } from "antd";
+import { Table, Space, Button, Modal, Form, Input, Select, Upload, message, Image, ConfigProvider, Row, Col, Checkbox, Tag } from "antd";
 import { UploadOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { getBranches } from "../../api/regions&branches";
 import arabic from "antd/lib/locale/ar_EG";
@@ -13,7 +13,7 @@ const arabicText = {
     deviceImage: "صورة الجهاز",
     deviceName: "اسم الجهاز",
     deviceType: "نوع الجهاز",
-    branch: "الفرع",
+    branches: "الفروع",
     availableTimes: "مواعيد العمل",
     actions: "الإجراءات",
     addDevice: "إضافة جهاز",
@@ -24,7 +24,7 @@ const arabicText = {
     deleteConfirmMessage: "هل أنت متأكد من رغبتك في حذف هذا الجهاز؟",
     deviceNameRequired: "يرجى إدخال اسم الجهاز!",
     deviceTypeRequired: "يرجى اختيار نوع الجهاز!",
-    branchRequired: "يرجى اختيار الفرع!",
+    branchesRequired: "يرجى اختيار فرع واحد على الأقل!",
     operationFailed: "فشلت العملية",
     deviceAdded: "تم إضافة الجهاز بنجاح",
     deviceUpdated: "تم تحديث الجهاز بنجاح",
@@ -34,14 +34,17 @@ const arabicText = {
     medicalDevices: "الأجهزة الطبية",
     cancel: "إلغاء",
     ok: "موافق",
+    active: "نشط",
+    inactive: "غير نشط",
+    priority: "الأولوية",
 };
 const deviceTypes = [
-    "ليزر ازالة الشعر",
-    "ليزر ازالة الشعر (تشقير)",
-    "اجهزة تنظيف البشرة",
-    "اجهزة التغذية ونحت القوام",
-    "اجهزة معالجة البشرة",
-    "اجهزة التجميل النسائي"
+    "ليزر إزالة الشعر",
+    "ليزر إزالة الشعر (تشقير)",
+    "أجهزة تنظيف البشرة",
+    "أجهزة التغذية ونحت القوام",
+    "أجهزة معالجة البشرة",
+    "أجهزة التجميل النسائي"
 ];
 const MedicalDevicesPage = () => {
     const [devices, setDevices] = useState([]);
@@ -62,19 +65,11 @@ const MedicalDevicesPage = () => {
                     getDevices(),
                     getBranches(),
                 ]);
-                console.log(branchesResponse);
-                // Transform devices data to match our interface
-                const devicesData = devicesResponse.map(device => ({
-                    ...device,
-                    _id: device._id || device.id.toString(),
-                    branch_id: Number(device.branch_id),
-                }));
-                // Transform branches data
                 const branchesData = branchesResponse.data.map(branch => ({
                     ...branch,
                     id: Number(branch.id),
                 }));
-                setDevices(devicesData);
+                setDevices(devicesResponse);
                 setBranches(branchesData);
             }
             catch (error) {
@@ -87,6 +82,17 @@ const MedicalDevicesPage = () => {
         };
         fetchData();
     }, []);
+    const parseBranchesIds = (branchesString) => {
+        try {
+            // Remove brackets and parse the string to array
+            const cleanedString = branchesString.replace(/[\[\]]/g, '');
+            return cleanedString.split(',').map(id => parseInt(id.trim()));
+        }
+        catch (error) {
+            console.error("Error parsing branches_ids:", error);
+            return [];
+        }
+    };
     const handleBeforeUpload = (file) => {
         const isImage = file.type.startsWith("image/");
         if (!isImage) {
@@ -123,15 +129,21 @@ const MedicalDevicesPage = () => {
     };
     const handleEdit = (device) => {
         setEditingDevice(device);
+        const branchIds = parseBranchesIds(device.branches_ids);
         form.setFieldsValue({
             name: device.name,
             type: device.type,
-            branch_id: device.branch_id,
+            branches_ids: branchIds,
             available_times: device.available_times,
-            priority: device.priority ?? 0,
-            is_active: device.is_active ?? true,
+            priority: device.priority,
+            is_active: device.is_active,
         });
-        setImagePreview(device.image_url || "");
+        if (device.image_url) {
+            setImagePreview(getImageUrl(device.image_url));
+        }
+        else {
+            setImagePreview("");
+        }
         setIsModalVisible(true);
     };
     const handleDelete = (id) => {
@@ -165,7 +177,9 @@ const MedicalDevicesPage = () => {
             formData.append("type", values.type);
             formData.append("priority", values.priority?.toString() || "0");
             formData.append("is_active", values.is_active ? "true" : "false");
-            formData.append("branch_id", values.branch_id.toString());
+            // Convert branches array to string format like "[1,2,3]"
+            const branchesString = `[${values.branches_ids.join(',')}]`;
+            formData.append("branches_ids", branchesString);
             formData.append("available_times", values.available_times || "");
             if (fileList.length > 0 && fileList[0].originFileObj) {
                 formData.append("image", fileList[0].originFileObj);
@@ -199,7 +213,7 @@ const MedicalDevicesPage = () => {
             title: arabicText.deviceImage,
             dataIndex: "image_url",
             key: "image",
-            render: (url) => url ? _jsx(Image, { src: getImageUrl(url), alt: "device", width: 50, height: 50, style: { objectFit: "cover" } }) : "-",
+            render: (url) => url ? (_jsx(Image, { src: getImageUrl(url), alt: "device", width: 50, height: 50, style: { objectFit: "cover" }, preview: false })) : "-",
         },
         {
             title: arabicText.deviceName,
@@ -212,24 +226,27 @@ const MedicalDevicesPage = () => {
             key: "type",
         },
         {
-            title: "الأولوية",
+            title: arabicText.priority,
             dataIndex: "priority",
             key: "priority",
             render: (val) => val ?? "-",
         },
         {
-            title: "نشط؟",
+            title: "الحالة",
             dataIndex: "is_active",
             key: "is_active",
-            render: (val) => (val ? "نعم" : "لا"),
+            render: (val) => (_jsx(Tag, { color: val ? "green" : "red", children: val ? arabicText.active : arabicText.inactive })),
         },
         {
-            title: arabicText.branch,
-            dataIndex: "branch_id",
-            key: "branch",
-            render: (branchId) => {
-                const branch = branches.find(b => b.id === branchId);
-                return branch ? branch.name : branchId.toString();
+            title: arabicText.branches,
+            dataIndex: "branches_ids",
+            key: "branches",
+            render: (branchesString) => {
+                const branchIds = parseBranchesIds(branchesString);
+                return branchIds.map(id => {
+                    const branch = branches.find(b => b.id === id);
+                    return branch ? branch.name : id;
+                }).join(", ");
             }
         },
         {
@@ -244,6 +261,6 @@ const MedicalDevicesPage = () => {
             render: (_, record) => (_jsxs(Space, { size: "middle", children: [_jsx(Button, { icon: _jsx(EditOutlined, {}), onClick: () => handleEdit(record), children: arabicText.edit }), _jsx(Button, { danger: true, onClick: () => handleDelete(record._id), icon: _jsx(DeleteOutlined, {}), loading: loading && deviceToDelete === record._id, children: arabicText.delete })] })),
         },
     ];
-    return (_jsx(ConfigProvider, { direction: "rtl", locale: arabic, children: _jsxs("div", { style: { padding: "24px", textAlign: "right" }, children: [_jsxs("div", { style: { marginBottom: "16px", display: "flex", justifyContent: "space-between" }, children: [_jsx("h2", { children: arabicText.medicalDevices }), _jsx(Button, { type: "primary", onClick: handleAdd, loading: loading, children: arabicText.addDevice })] }), _jsx(Table, { columns: columns, dataSource: devices, rowKey: "_id", bordered: true, loading: loading, pagination: { pageSize: 10 } }), _jsx(Modal, { title: editingDevice ? arabicText.editDevice : arabicText.addDevice, open: isModalVisible, onOk: handleOk, onCancel: () => setIsModalVisible(false), okText: arabicText.ok, cancelText: arabicText.cancel, confirmLoading: loading, width: 800, children: _jsxs(Form, { form: form, layout: "vertical", children: [_jsxs(Row, { gutter: 16, children: [_jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.deviceName, name: "name", rules: [{ required: true, message: arabicText.deviceNameRequired }], children: _jsx(Input, {}) }) }), _jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.deviceType, name: "type", rules: [{ required: true, message: arabicText.deviceTypeRequired }], children: _jsx(Select, { placeholder: arabicText.deviceType, children: deviceTypes.map(type => (_jsx(Option, { value: type, children: type }, type))) }) }) })] }), _jsxs(Row, { gutter: 16, children: [_jsx(Col, { span: 12, children: _jsx(Form.Item, { label: "\u0627\u0644\u0623\u0648\u0644\u0648\u064A\u0629", name: "priority", children: _jsx(Input, { type: "number", placeholder: "\u0645\u062B\u0627\u0644: 1 (\u0623\u0639\u0644\u0649 \u0623\u0648\u0644\u0648\u064A\u0629)" }) }) }), _jsx(Col, { span: 12, children: _jsx(Form.Item, { label: "\u0646\u0634\u0637\u061F", name: "is_active", valuePropName: "checked", children: _jsxs(Select, { children: [_jsx(Option, { value: true, children: "\u0646\u0639\u0645" }), _jsx(Option, { value: false, children: "\u0644\u0627" })] }) }) })] }), _jsxs(Row, { gutter: 16, children: [_jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.branch, name: "branch_id", rules: [{ required: true, message: arabicText.branchRequired }], children: _jsx(Select, { placeholder: arabicText.branch, children: branches.map(branch => (_jsx(Option, { value: branch.id, children: branch.name }, branch.id))) }) }) }), _jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.availableTimes, name: "available_times", children: _jsx(TextArea, { rows: 2, placeholder: "\u0645\u062B\u0627\u0644: \u0627\u0644\u0633\u0628\u062A (1 \u0638 - 10\u0645), \u0627\u0644\u0623\u062D\u062F (9:30 \u0635-10\u0645)" }) }) })] }), _jsxs(Form.Item, { label: arabicText.uploadImage, children: [_jsx(Upload, { listType: "picture", fileList: fileList, beforeUpload: handleBeforeUpload, onChange: handleImageChange, maxCount: 1, children: _jsx(Button, { icon: _jsx(UploadOutlined, {}), children: arabicText.uploadImage }) }), imagePreview && (_jsx(Image, { src: imagePreview, alt: "Preview", style: { marginTop: 8, maxHeight: 150 } }))] })] }) }), _jsx(Modal, { title: arabicText.confirmDelete, open: deleteModalVisible, onOk: confirmDelete, onCancel: () => setDeleteModalVisible(false), okText: arabicText.ok, cancelText: arabicText.cancel, confirmLoading: loading, children: _jsx("p", { children: arabicText.deleteConfirmMessage }) })] }) }));
+    return (_jsx(ConfigProvider, { direction: "rtl", locale: arabic, children: _jsxs("div", { style: { padding: "24px", textAlign: "right" }, children: [_jsxs("div", { style: { marginBottom: "16px", display: "flex", justifyContent: "space-between" }, children: [_jsx("h2", { children: arabicText.medicalDevices }), _jsx(Button, { type: "primary", onClick: handleAdd, loading: loading, children: arabicText.addDevice })] }), _jsx(Table, { columns: columns, dataSource: devices, rowKey: "_id", bordered: true, loading: loading, pagination: { pageSize: 10 }, scroll: { x: true } }), _jsx(Modal, { title: editingDevice ? arabicText.editDevice : arabicText.addDevice, open: isModalVisible, onOk: handleOk, onCancel: () => setIsModalVisible(false), okText: arabicText.ok, cancelText: arabicText.cancel, confirmLoading: loading, width: 800, children: _jsxs(Form, { form: form, layout: "vertical", children: [_jsxs(Row, { gutter: 16, children: [_jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.deviceName, name: "name", rules: [{ required: true, message: arabicText.deviceNameRequired }], children: _jsx(Input, {}) }) }), _jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.deviceType, name: "type", rules: [{ required: true, message: arabicText.deviceTypeRequired }], children: _jsx(Select, { placeholder: arabicText.deviceType, children: deviceTypes.map(type => (_jsx(Option, { value: type, children: type }, type))) }) }) })] }), _jsxs(Row, { gutter: 16, children: [_jsx(Col, { span: 12, children: _jsx(Form.Item, { label: arabicText.priority, name: "priority", children: _jsx(Input, { type: "number", placeholder: "\u0645\u062B\u0627\u0644: 1 (\u0623\u0639\u0644\u0649 \u0623\u0648\u0644\u0648\u064A\u0629)" }) }) }), _jsx(Col, { span: 12, children: _jsx(Form.Item, { label: "\u0627\u0644\u062D\u0627\u0644\u0629", name: "is_active", valuePropName: "checked", children: _jsx(Checkbox, { children: arabicText.active }) }) })] }), _jsx(Row, { gutter: 16, children: _jsx(Col, { span: 24, children: _jsx(Form.Item, { label: arabicText.branches, name: "branches_ids", rules: [{ required: true, message: arabicText.branchesRequired }], children: _jsx(Select, { mode: "multiple", placeholder: arabicText.branches, showSearch: true, optionFilterProp: "children", filterOption: (input, option) => (option?.children).toLowerCase().includes(input.toLowerCase()), children: branches.map(branch => (_jsx(Option, { value: branch.id, children: branch.name }, branch.id))) }) }) }) }), _jsx(Row, { gutter: 16, children: _jsx(Col, { span: 24, children: _jsx(Form.Item, { label: arabicText.availableTimes, name: "available_times", children: _jsx(TextArea, { rows: 3, placeholder: "\u0645\u062B\u0627\u0644: \u0627\u0644\u0633\u0628\u062A (2 \u0638 - 10\u0645), \u0627\u0644\u0623\u062D\u062F (9:30 \u0635 _ 2 \u0645 ) & ( 6:30 \u0645 _ 10\u0645), \u0627\u0644\u062E\u0645\u064A\u0633 (9:30 \u0635 -7\u0645)" }) }) }) }), _jsxs(Form.Item, { label: arabicText.deviceImage, children: [_jsx(Upload, { listType: "picture-card", fileList: fileList, beforeUpload: handleBeforeUpload, onChange: handleImageChange, maxCount: 1, accept: "image/*", children: fileList.length >= 1 ? null : (_jsxs("div", { children: [_jsx(UploadOutlined, {}), _jsx("div", { style: { marginTop: 8 }, children: arabicText.uploadImage })] })) }), imagePreview && (_jsx(Image, { src: imagePreview, alt: "Preview", style: { marginTop: 8, maxHeight: 150 }, preview: false }))] })] }) }), _jsx(Modal, { title: arabicText.confirmDelete, open: deleteModalVisible, onOk: confirmDelete, onCancel: () => setDeleteModalVisible(false), okText: arabicText.ok, cancelText: arabicText.cancel, confirmLoading: loading, children: _jsx("p", { children: arabicText.deleteConfirmMessage }) })] }) }));
 };
 export default MedicalDevicesPage;
