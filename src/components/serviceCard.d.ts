@@ -7,21 +7,33 @@ interface Branch {
     id: string;
     name: string;
 }
-interface Category {
-    id: string | number;
+interface Department {
+    id: number;
     name: string;
-    description: string;
-    imageUrl: string;
-    doctors?: Doctor[];
-    branches?: Branch[];
-    capabilities?: string[];
-    approach?: string;
-    department?: string;
+}
+interface Category {
+    id: number;
+    name_ar: string;
+    name_en?: string | null;
 }
 interface ServiceCardProps {
-    category: Category;
-    handleEdit: (category: Category) => void;
-    handleDelete: (id: string | number) => void;
+    service: {
+        id: number;
+        name_ar: string;
+        name_en: string | null;
+        description: string | null;
+        image: string | null;
+        is_active: number;
+        priority: number;
+        created_at: string;
+        updated_at: string;
+        department?: Department;
+        category?: Category;
+        doctors?: Doctor[];
+        branches?: Branch[];
+    };
+    onEdit: () => void;
+    onDelete: () => void;
 }
 declare const ServiceCard: React.FC<ServiceCardProps>;
 export default ServiceCard;

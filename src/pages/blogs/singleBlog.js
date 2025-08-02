@@ -73,12 +73,12 @@ const BlogSinglePage = () => {
         try {
             setLoading(true);
             const formData = new FormData();
-            formData.append('title2', editedBlog.title2 || '');
-            formData.append('author', editedBlog.author || '');
-            formData.append('content', editedBlog.content || '');
-            formData.append('slug', editedBlog.slug || '');
-            formData.append('blogSingleImg', editedBlog.blogSingleImg || '');
-            formData.append('comment', String(editedBlog.comment ?? 0));
+            // Append all fields from editedBlog
+            Object.entries(editedBlog).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    formData.append(key, value.toString());
+                }
+            });
             if (imageFile) {
                 formData.append('image', imageFile);
             }
@@ -86,10 +86,10 @@ const BlogSinglePage = () => {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             // Refresh data
-            const updated = await axios.get(`https://www.ss.mastersclinics.com/blogs/${id}`);
-            setBlog(updated.data);
-            setEditedBlog(updated.data);
-            setImagePreview(getImageUrl(updated.data.image));
+            const response = await axios.get(`https://www.ss.mastersclinics.com/blogs/${id}`);
+            setBlog(response.data);
+            setEditedBlog(response.data);
+            setImagePreview(getImageUrl(response.data.image));
             setIsEditing(false);
             setImageFile(null);
         }
@@ -110,9 +110,9 @@ const BlogSinglePage = () => {
     }
     if (!blog)
         return null;
-    return (_jsx("article", { className: "blog-single", children: isEditing ? (_jsxs("div", { className: "edit-controls", children: [_jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0639\u0646\u0648\u0627\u0646:" }), _jsx("input", { type: "text", name: "title2", value: editedBlog.title2 || '', onChange: handleInputChange })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0643\u0627\u062A\u0628:" }), _jsx("input", { type: "text", name: "author", value: editedBlog.author || '', onChange: handleInputChange })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0635\u0648\u0631\u0629:" }), _jsxs("div", { className: "image-upload-container", children: [_jsx("img", { src: currentImage, alt: "\u0645\u0639\u0627\u064A\u0646\u0629", className: "image-preview", onError: (e) => {
+    return (_jsx("article", { className: "blog-single", children: isEditing ? (_jsxs("div", { className: "edit-controls", children: [_jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0639\u0646\u0648\u0627\u0646:" }), _jsx("input", { type: "text", name: "title2", value: editedBlog.title2 || '', onChange: handleInputChange })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0643\u0627\u062A\u0628:" }), _jsx("input", { type: "text", name: "author", value: editedBlog.author || '', onChange: handleInputChange })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0645\u062D\u062A\u0648\u0649:" }), _jsx("textarea", { name: "content", value: editedBlog.content || '', onChange: handleInputChange, rows: 6 })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0635\u0648\u0631\u0629:" }), _jsxs("div", { className: "image-upload-container", children: [_jsx("img", { src: currentImage, alt: "\u0645\u0639\u0627\u064A\u0646\u0629", className: "image-preview", onError: (e) => {
                                         e.target.src = 'https://images.pexels.com/photos/3998419/pexels-photo-3998419.jpeg';
-                                    } }), _jsxs("div", { className: "upload-actions", children: [_jsx("button", { type: "button", onClick: () => fileInputRef.current?.click(), className: "upload-button", children: "\u0627\u062E\u062A\u0631 \u0635\u0648\u0631\u0629" }), _jsx("input", { type: "file", ref: fileInputRef, onChange: handleImageChange, accept: "image/*", style: { display: 'none' } })] })] })] }), _jsxs("div", { className: "form-group", children: [_jsx("label", { children: "\u0627\u0644\u0645\u062D\u062A\u0648\u0649:" }), _jsx("textarea", { name: "content", value: editedBlog.content || '', onChange: handleInputChange, rows: 6 })] }), _jsxs("div", { className: "button-group", children: [_jsx("button", { onClick: handleSave, className: "save-button", disabled: loading, children: loading ? 'جاري الحفظ...' : 'حفظ التغييرات' }), _jsx("button", { onClick: () => {
+                                    } }), _jsxs("div", { className: "upload-actions", children: [_jsx("button", { type: "button", onClick: () => fileInputRef.current?.click(), className: "upload-button", children: "\u0627\u062E\u062A\u0631 \u0635\u0648\u0631\u0629" }), _jsx("input", { type: "file", ref: fileInputRef, onChange: handleImageChange, accept: "image/*", style: { display: 'none' } })] })] })] }), _jsxs("div", { className: "button-group", children: [_jsx("button", { onClick: handleSave, className: "save-button", disabled: loading, children: loading ? 'جاري الحفظ...' : 'حفظ التغييرات' }), _jsx("button", { onClick: () => {
                                 setIsEditing(false);
                                 setImageFile(null);
                                 setImagePreview(getImageUrl(blog.image));

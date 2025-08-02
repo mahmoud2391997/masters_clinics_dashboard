@@ -53,6 +53,8 @@ function getAuthHeaders(): AxiosRequestConfig {
 // Get all devices
 export const getDevices = async (): Promise<Device[]> => {
   const response = await axios.get<Device[]>(`https://www.ss.mastersclinics.com/devices`, getAuthHeaders());
+  console.log(response.data);
+  
   return response.data;
 };
 

@@ -12,6 +12,7 @@ function getAuthHeaders() {
 // Get all devices
 export const getDevices = async () => {
     const response = await axios.get(`https://www.ss.mastersclinics.com/devices`, getAuthHeaders());
+    console.log(response.data);
     return response.data;
 };
 // Add new device

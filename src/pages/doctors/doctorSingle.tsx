@@ -1,39 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import {
-  Box, Typography, TextField, Button,  Paper, CircularProgress,
-  Snackbar, Alert, Switch, MenuItem, Stack, FormControl, InputLabel, Select, Chip
+  Box, Typography, TextField, Button, Paper, CircularProgress, Snackbar, Alert,
+  MenuItem, Stack, FormControl, InputLabel, Select
 } from '@mui/material';
-import {  Save, Cancel, ArrowBack } from '@mui/icons-material';
-
-interface WorkingHoursSlot {
-  days: string[];
-  openingTime: string;
-  closingTime: string;
-}
-
-interface Doctor {
-  id: number;
-  name: string;
-  title: string;
-  description: string;
-  position: string;
-  practice_area: string;
-  experience: string;
-  address: string;
-  phone: string;
-  email: string;
-  personal_experience: string;
-  education: string[];
-  skills: string[];
-  achievements: string[];
-  working_hours: WorkingHoursSlot[];
-  branches_ids: number[];
-  department_id: number;
-  image: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { useParams, useNavigate } from 'react-router-dom';
+import { Save, Cancel, ArrowBack } from '@mui/icons-material';
+import ImageIcon from '@mui/icons-material/Image';
 
 interface Branch {
   id: number;
@@ -45,19 +17,19 @@ interface Department {
   name: string;
 }
 
-const parseArrayField = (field: any): string[] => {
-  if (Array.isArray(field)) return field;
-  if (typeof field === 'string') {
-    try {
-      const parsed = JSON.parse(field);
-      if (Array.isArray(parsed)) return parsed;
-      return [field];
-    } catch {
-      return [field];
-    }
-  }
-  return [];
-};
+interface Doctor {
+  id: number;
+  name: string;
+  specialty: string;
+  branch_id: number;
+  department_id: number;
+  services: string;
+  image?: string;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 const DoctorSingle: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -65,12 +37,13 @@ const DoctorSingle: React.FC = () => {
 
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [form, setForm] = useState<Partial<Doctor>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [branchOptions, setBranchOptions] = useState<Branch[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<Department[]>([]);
-  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   const getAuthToken = () => sessionStorage.getItem('token') || '';
 
@@ -78,342 +51,167 @@ const DoctorSingle: React.FC = () => {
     const token = getAuthToken();
     const headers = {
       ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      'Authorization': `Bearer ${token}`
     };
     return fetch(url, { ...options, headers });
   };
 
   useEffect(() => {
-    const fetchDoctor = async () => {
+    const fetchData = async () => {
       try {
-        setLoading(true);
         const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-
-        const parsedDoctor: Doctor = {
-          ...data,
-          education: parseArrayField(data.education),
-          skills: parseArrayField(data.skills),
-          achievements: parseArrayField(data.achievements),
-          working_hours: data.working_hours || [],
-         branches_ids: Array.isArray(data.branches_ids) ? data.branches_ids :
-  (data.branches_ids ? JSON.parse(data.branches_ids) : []),
-
-          department_id: data.department_id || 0,
-          image: data.image || null,
-        };
-console.log(parsedDoctor);
-
-        setDoctor(parsedDoctor);
-        setForm(parsedDoctor);
-      } catch (error) {
-        console.error('Error fetching doctor:', error);
-        setSnackbar({ open: true, message: 'حدث خطأ أثناء جلب بيانات الطبيب', severity: 'error' });
+        const data: Doctor = await res.json();
+        setDoctor(data);
+        setForm(data);
+      } catch (err) {
+        setSnackbar({ open: true, message: 'حدث خطأ أثناء تحميل بيانات الطبيب', severity: 'error' });
       } finally {
         setLoading(false);
       }
     };
 
-    const fetchBranchesAndDepartments = async () => {
+    const fetchOptions = async () => {
       try {
-        setOptionsLoading(true);
         const [branchesRes, departmentsRes] = await Promise.all([
           fetchWithAuth('https://www.ss.mastersclinics.com/branches'),
           fetchWithAuth('https://www.ss.mastersclinics.com/departments')
         ]);
-
-        if (!branchesRes.ok || !departmentsRes.ok) throw new Error('Failed to fetch options');
-
-        const branches = await branchesRes.json();
-        const departments = await departmentsRes.json();
-
-        setBranchOptions(Array.isArray(branches) ? branches : []);
-        setDepartmentOptions(Array.isArray(departments) ? departments : []);
-      } catch (error) {
-        console.error('Error fetching options:', error);
-        setSnackbar({ open: true, message: 'حدث خطأ أثناء جلب بيانات الفروع والأقسام', severity: 'error' });
-      } finally {
-        setOptionsLoading(false);
+        setBranchOptions(await branchesRes.json());
+        setDepartmentOptions(await departmentsRes.json());
+      } catch (err) {
+        setSnackbar({ open: true, message: 'فشل تحميل الفروع أو الأقسام', severity: 'error' });
       }
     };
 
     if (id) {
-      fetchDoctor();
-      fetchBranchesAndDepartments();
+      fetchData();
+      fetchOptions();
     }
   }, [id]);
 
   const handleChange = (field: keyof Doctor, value: any) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleArrayChange = (field: keyof Doctor, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value.split(',').map(item => item.trim()),
-    }));
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
- const handleSave = async () => {
-  try {
-    // Ensure branches_ids is always an array
-    const formData = {
-      ...form,
-      branches_ids: Array.isArray(form.branches_ids) ? form.branches_ids : [],
-      education: form.education || [],
-      skills: form.skills || [],
-      achievements: form.achievements || [],
-      working_hours: form.working_hours || []
-    };
+  const handleSave = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('name', form.name || '');
+      formData.append('specialty', form.specialty || '');
+      formData.append('services', form.services || '');
+      formData.append('branch_id', String(form.branch_id || ''));
+      formData.append('department_id', String(form.department_id || ''));
+      formData.append('priority', String(form.priority ?? 0));
+      formData.append('is_active', String(form.is_active ?? true));
 
-    const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(formData),
-    });
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
 
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`, {
+        method: 'PUT',
+        body: formData,
+      });
 
-    setDoctor(form as Doctor);
-    setEditMode(false);
-    setSnackbar({ open: true, message: 'تم تحديث بيانات الطبيب بنجاح', severity: 'success' });
-  } catch (error) {
-    console.error('Error updating doctor:', error);
-    setSnackbar({ open: true, message: 'حدث خطأ أثناء تحديث بيانات الطبيب', severity: 'error' });
-  }
-};
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const updated = await res.json();
+      setDoctor(updated);
+      setForm(updated);
+      setImageFile(null);
+      setImagePreview(null);
+      setEditMode(false);
+      setSnackbar({ open: true, message: 'تم التحديث بنجاح', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'فشل تحديث بيانات الطبيب', severity: 'error' });
+    }
+  };
 
-  if (!doctor) {
-    return (
-      <Typography variant="h6" color="error" align="center">
-        لا يوجد بيانات لهذا الطبيب
-      </Typography>
-    );
-  }
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><CircularProgress /></Box>;
+  if (!doctor) return <Typography variant="h6" color="error" align="center">لا توجد بيانات لهذا الطبيب</Typography>;
 
   return (
     <Box sx={{ p: 2 }}>
-      <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)}>
-        عودة
-      </Button>
+      <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)}>عودة</Button>
+      <Typography variant="h4" gutterBottom>تفاصيل الطبيب: {doctor.name}</Typography>
+      <Box component={Paper} sx={{ p: 3, mt: 2 }}>
+        <Stack spacing={2}>
+          <TextField label="الاسم" value={form.name || ''} onChange={(e) => handleChange('name', e.target.value)} fullWidth disabled={!editMode} />
+          <TextField label="التخصص" value={form.specialty || ''} onChange={(e) => handleChange('specialty', e.target.value)} fullWidth disabled={!editMode} />
+          <TextField label="الخدمات" value={form.services || ''} onChange={(e) => handleChange('services', e.target.value)} fullWidth multiline rows={4} disabled={!editMode} />
 
-      <Typography variant="h4" gutterBottom>
-        تفاصيل الطبيب: {doctor.name}
-      </Typography>
+          <FormControl fullWidth disabled={!editMode}>
+            <InputLabel>الفرع</InputLabel>
+            <Select value={form.branch_id || ''} onChange={(e) => handleChange('branch_id', e.target.value)} label="الفرع">
+              {branchOptions.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}
+            </Select>
+          </FormControl>
 
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Switch checked={editMode} onChange={() => setEditMode(!editMode)} />
-        <Typography>وضع التعديل</Typography>
-      </Stack>
+          <FormControl fullWidth disabled={!editMode}>
+            <InputLabel>القسم</InputLabel>
+            <Select value={form.department_id || ''} onChange={(e) => handleChange('department_id', e.target.value)} label="القسم">
+              {departmentOptions.map((dep) => <MenuItem key={dep.id} value={dep.id}>{dep.name}</MenuItem>)}
+            </Select>
+          </FormControl>
 
-      <Box component={Paper} sx={{ p: 2, mt: 2 }}>
-        <TextField
-          label="الاسم"
-          value={form.name || ''}
-          onChange={(e) => handleChange('name', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="اللقب"
-          value={form.title || ''}
-          onChange={(e) => handleChange('title', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="الوصف"
-          value={form.description || ''}
-          onChange={(e) => handleChange('description', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          multiline
-          rows={3}
-        />
-        
-        <TextField
-          label="المنصب"
-          value={form.position || ''}
-          onChange={(e) => handleChange('position', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="مجال الممارسة"
-          value={form.practice_area || ''}
-          onChange={(e) => handleChange('practice_area', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="الخبرة"
-          value={form.experience || ''}
-          onChange={(e) => handleChange('experience', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="العنوان"
-          value={form.address || ''}
-          onChange={(e) => handleChange('address', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          multiline
-          rows={2}
-        />
-        
-        <TextField
-          label="الهاتف"
-          value={form.phone || ''}
-          onChange={(e) => handleChange('phone', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="البريد الإلكتروني"
-          value={form.email || ''}
-          onChange={(e) => handleChange('email', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-        />
-        
-        <TextField
-          label="التجربة الشخصية"
-          value={form.personal_experience || ''}
-          onChange={(e) => handleChange('personal_experience', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          multiline
-          rows={4}
-        />
-        
-        <TextField
-          label="المؤهلات (تعليم)"
-          value={form.education?.join(', ') || ''}
-          onChange={(e) => handleArrayChange('education', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          helperText="افصل بين العناصر بفاصلة"
-        />
-        
-        <TextField
-          label="المهارات"
-          value={form.skills?.join(', ') || ''}
-          onChange={(e) => handleArrayChange('skills', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          helperText="افصل بين العناصر بفاصلة"
-        />
-        
-        <TextField
-          label="الإنجازات"
-          value={form.achievements?.join(', ') || ''}
-          onChange={(e) => handleArrayChange('achievements', e.target.value)}
-          fullWidth
-          disabled={!editMode}
-          margin="normal"
-          helperText="افصل بين العناصر بفاصلة"
-        />
+          <TextField label="الأولوية" type="number" value={form.priority ?? 0} onChange={(e) => handleChange('priority', parseInt(e.target.value))} fullWidth disabled={!editMode} />
 
-        <FormControl fullWidth margin="normal" disabled={!editMode || optionsLoading}>
-          <InputLabel>الفروع</InputLabel>
-          <Select
-            multiple
-            value={form.branches_ids || []}
-            onChange={(e) => handleChange('branches_ids', e.target.value)}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected.map((value) => (
-                  <Chip key={value} label={branchOptions.find(b => b.id === value)?.name || value} />
-                ))}
+          <FormControl fullWidth disabled={!editMode}>
+            <InputLabel>الحالة</InputLabel>
+            <Select value={String(form.is_active ?? true)} onChange={(e) => handleChange('is_active', e.target.value === 'true')} label="الحالة">
+              <MenuItem value="true">نشط</MenuItem>
+              <MenuItem value="false">غير نشط</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Box>
+            <Typography variant="subtitle1" gutterBottom>صورة الطبيب:</Typography>
+            {imagePreview ? (
+              <img src={imagePreview} alt="New preview" style={{ maxWidth: 200, borderRadius: 8, marginTop: 8 }} />
+            ) : doctor.image ? (
+              <img src={`https://www.ss.mastersclinics.com${doctor.image}`} alt="Current doctor" style={{ maxWidth: 200, borderRadius: 8, marginTop: 8 }} />
+            ) : (
+              <Typography variant="body2" color="textSecondary">لا توجد صورة متاحة</Typography>
+            )}
+            {editMode && (
+              <Box mt={2}>
+                <Button component="label" startIcon={<ImageIcon />} variant="outlined">
+                  {doctor.image ? 'تغيير الصورة' : 'تحميل صورة'}
+                  <input type="file" hidden accept="image/*" onChange={handleImageChange} />
+                </Button>
+                {imageFile && <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>الملف المحدد: {imageFile.name}</Typography>}
               </Box>
             )}
-          >
-            {branchOptions.map((branch) => (
-              <MenuItem key={branch.id} value={branch.id}>
-                {branch.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          </Box>
 
-        <FormControl fullWidth margin="normal" disabled={!editMode || optionsLoading}>
-          <InputLabel>القسم</InputLabel>
-          <Select
-            value={form.department_id || ''}
-            onChange={(e) => handleChange('department_id', e.target.value)}
-          >
-            {departmentOptions.map((dep) => (
-              <MenuItem key={dep.id} value={dep.id}>{dep.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <TextField
-          label="تاريخ الإنشاء"
-          value={form.created_at || ''}
-          fullWidth
-          disabled
-          margin="normal"
-        />
-        
-        <TextField
-          label="تاريخ التحديث"
-          value={form.updated_at || ''}
-          fullWidth
-          disabled
-          margin="normal"
-        />
+          <TextField label="تاريخ الإنشاء" value={doctor.created_at} fullWidth disabled />
+          <TextField label="آخر تعديل" value={doctor.updated_at} fullWidth disabled />
+        </Stack>
       </Box>
 
-      {editMode && (
-        <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-          <Button variant="contained" color="primary" startIcon={<Save />} onClick={handleSave}>
-            حفظ
-          </Button>
-          <Button variant="outlined" color="secondary" startIcon={<Cancel />} onClick={() => setEditMode(false)}>
-            إلغاء
-          </Button>
+      {editMode ? (
+        <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+          <Button variant="contained" color="primary" startIcon={<Save />} onClick={handleSave}>حفظ</Button>
+          <Button variant="outlined" color="secondary" startIcon={<Cancel />} onClick={() => { setEditMode(false); setImageFile(null); setImagePreview(null); setForm(doctor); }}>إلغاء</Button>
         </Stack>
+      ) : (
+        <Button sx={{ mt: 2 }} variant="outlined" onClick={() => setEditMode(true)}>تعديل البيانات</Button>
       )}
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-          {snackbar.message}
-        </Alert>
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>{snackbar.message}</Alert>
       </Snackbar>
     </Box>
   );

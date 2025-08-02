@@ -17,9 +17,8 @@ const BlogsPage: React.FC = () => {
     title2: "",
     author: "",
     content: "",
-    tags: [],
-    categories: [],
     image: "",
+    created_at:""
   });
 
   useEffect(() => {
@@ -63,10 +62,7 @@ const BlogsPage: React.FC = () => {
       formData.append("slug", form.slug);
       formData.append("title2", form.title2);
       formData.append("author", form.author);
-
       formData.append("content", form.content || "");
-      formData.append("tags", JSON.stringify(form.tags));
-      formData.append("categories", JSON.stringify(form.categories));
 
       if (form.imageFile) {
         formData.append("image", form.imageFile);
@@ -83,9 +79,8 @@ const BlogsPage: React.FC = () => {
         title2: "",
         author: "",
         content: "",
-        tags: [],
-        categories: [],
         image: "",
+        created_at:"",
         imageFile: undefined,
       });
 
@@ -93,6 +88,19 @@ const BlogsPage: React.FC = () => {
     } catch (error) {
       console.error("فشل في إضافة المدونة:", error);
       toast.error("فشل في إضافة المدونة");
+    }
+  };
+
+  const handleDeleteBlog = async (id: number) => {
+    if (window.confirm("هل أنت متأكد أنك تريد حذف هذه المدونة؟")) {
+      try {
+        await axios.delete(`https://www.ss.mastersclinics.com/blogs/${id}`);
+        setBlogs(blogs.filter(blog => blog.id !== id));
+        toast.success("تم حذف المدونة بنجاح");
+      } catch (error) {
+        console.error("فشل في حذف المدونة:", error);
+        toast.error("فشل في حذف المدونة");
+      }
     }
   };
 
@@ -129,7 +137,6 @@ const BlogsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">إدارة المدونات</h1>
 
-        {/* Search */}
         <div className="mb-8">
           <div className="relative max-w-md mx-auto">
             <input
@@ -151,7 +158,6 @@ const BlogsPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Add Form */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-md p-6 sticky top-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">إضافة مدونة جديدة</h2>
@@ -197,24 +203,6 @@ const BlogsPage: React.FC = () => {
                   {formErrors.content && <p className="text-red-500 text-xs mt-1">{formErrors.content}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الوسوم</label>
-                  <input
-                    type="text"
-                    value={form.tags?.join(", ")}
-                    onChange={(e) => setForm({ ...form, tags: e.target.value.split(",").map(tag => tag.trim()) })}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">التصنيفات</label>
-                  <input
-                    type="text"
-                    value={form.categories?.join(", ")}
-                    onChange={(e) => setForm({ ...form, categories: e.target.value.split(",").map(cat => cat.trim()) })}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ملف الصورة</label>
                   <input
                     type="file"
@@ -232,14 +220,23 @@ const BlogsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Blog List */}
           <div className="lg:col-span-2">
             {filteredBlogs.length === 0 ? (
               <div className="bg-white rounded-xl shadow-md p-8 text-center">لم يتم العثور على مدونات</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredBlogs.map((blog) => (
-                  <div key={blog.slug} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-200">
+                  <div key={blog.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-200 relative">
+                    <button
+                      onClick={() => handleDeleteBlog(blog.id)}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
+                      title="حذف المدونة"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+
                     <div className="h-48 overflow-hidden">
                       <img
                         src={getImageUrl(blog.image || "") || "/placeholder.png"}
@@ -248,20 +245,20 @@ const BlogsPage: React.FC = () => {
                       />
                     </div>
                     <div className="p-6">
-                      <div className="flex items-center space-x-2 mb-2">
-                        {blog.tags?.map((tag, index) => (
-                          <span key={index} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">{tag}</span>
-                        ))}
-                      </div>
                       <h3 className="text-xl font-bold text-gray-800 mb-2">{blog.title2}</h3>
                       <p className="text-sm text-gray-600 mb-4">بواسطة {blog.author}</p>
                       <p className="text-gray-700 mb-4 line-clamp-2">{blog.content}</p>
-                      <Link to={`/blogs/${blog.id}`} className="inline-flex items-center text-green-600 hover:text-green-700 font-medium">
-                        اقرأ المزيد
-                        <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
+                      <div className="flex justify-between items-center">
+                        <Link to={`/blogs/${blog.id}`} className="inline-flex items-center text-green-600 hover:text-green-700 font-medium">
+                          اقرأ المزيد
+                          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        <span className="text-xs text-gray-500">
+                          {new Date(blog.created_at).toLocaleDateString('ar-EG')}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}

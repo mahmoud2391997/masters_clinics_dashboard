@@ -28,6 +28,8 @@ import {
   DialogActions,
   IconButton,
   Tooltip,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import { 
   ArrowBack, 
@@ -42,8 +44,13 @@ import {
 
 interface Service {
   id: number;
-  name: string;
+  name_ar: string;
+  name_en: string;
   department_id?: number;
+  branches?: any;
+  description?: string;
+  doctors_ids?: any;
+  is_active?: boolean;
 }
 
 interface Doctor {
@@ -67,9 +74,11 @@ interface Offer {
   priceBefore: string;
   priceAfter: string;
   discountPercentage: string;
-  branches: string[];
-  services_ids: number[];
-  doctors_ids: number[];
+  branches: any[];
+  services_ids: any[];
+  doctors_ids: any[];
+  is_active: boolean;
+  priority: number;
   createdAt: {
     _seconds: number;
     _nanoseconds: number;
@@ -87,6 +96,8 @@ interface OfferFormData {
   doctors_ids: number[];
   imageUrl: string;
   imageFile: File | null;
+  is_active: boolean;
+  priority: number;
 }
 
 interface OfferDialogProps {
@@ -208,11 +219,8 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
     setEditData(prev => {
       const newData = {...prev};
       if (type === 'branches') {
-        newData.branches = values;
-        newData.doctors_ids = values.length === 0 ? [] : 
-          prev.doctors_ids.filter(id => 
-            filteredDoctors.some(d => d.id === id)
-          );
+        newData.branches = values.map(v => v.id);
+        newData.doctors_ids = [];
       } else if (type === 'services') {
         newData.services_ids = values.map((item: Service) => item.id);
       } else if (type === 'doctors') {
@@ -236,6 +244,8 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
         branches: editData.branches.map(b => b.toString()),
         services_ids: editData.services_ids,
         doctors_ids: editData.doctors_ids,
+        is_active: editData.is_active,
+        priority: editData.priority,
         image: editData.imageUrl || offer.image
       };
 
@@ -272,6 +282,8 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
             <Typography variant="h6">معلومات العرض</Typography>
             <Typography><strong>العنوان:</strong> {offer.title}</Typography>
             <Typography><strong>الوصف:</strong> {offer.description}</Typography>
+            <Typography><strong>الحالة:</strong> {offer.is_active ? 'نشط' : 'غير نشط'}</Typography>
+            <Typography><strong>الأولوية:</strong> {offer.priority}</Typography>
             
             <Typography variant="h6">التسعير</Typography>
             <Typography><strong>السعر الأصلي:</strong> {offer.priceBefore} ر.س</Typography>
@@ -280,16 +292,19 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
             
             <Typography variant="h6">العناصر المرتبطة</Typography>
             <Typography>
-              <strong>الفروع:</strong> {offer.branches.map(branchId => 
-                branches.find(b => b.id === parseInt(branchId))?.name).filter(Boolean).join(', ')}
+              <strong>الفروع:</strong> {offer.branches.map(branch => 
+                typeof branch === 'object' ? branch.name : branches.find(b => b.id === parseInt(branch))?.name
+              ).filter(Boolean).join(', ')}
             </Typography>
             <Typography>
-              <strong>الخدمات:</strong> {offer.services_ids.map(id => 
-                services.find(s => s.id === id)?.name).filter(Boolean).join(', ')}
+              <strong>الخدمات:</strong> {offer.services_ids.map(service => 
+                typeof service === 'object' ? service.name_ar : services.find(s => s.id === service)?.name_ar
+              ).filter(Boolean).join(', ')}
             </Typography>
             <Typography>
-              <strong>الأطباء:</strong> {offer.doctors_ids.map(id => 
-                allDoctors.find(d => d.id === id)?.name).filter(Boolean).join(', ')}
+              <strong>الأطباء:</strong> {offer.doctors_ids.map(doctor => 
+                typeof doctor === 'object' ? doctor.name : allDoctors.find(d => d.id === doctor)?.name
+              ).filter(Boolean).join(', ')}
             </Typography>
             
             {offer.image && (
@@ -327,6 +342,35 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
               onChange={handleChange}
               variant="outlined"
             />
+
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={editData.is_active}
+                    onChange={(e) => setEditData(prev => ({
+                      ...prev,
+                      is_active: e.target.checked
+                    }))}
+                    name="is_active"
+                    color="primary"
+                  />
+                }
+                label="العرض نشط"
+                labelPlacement="start"
+              />
+
+              <TextField
+                fullWidth
+                type="number"
+                label="الأولوية"
+                name="priority"
+                value={editData.priority}
+                onChange={handleChange}
+                variant="outlined"
+                inputProps={{ min: 0 }}
+              />
+            </Box>
             
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
@@ -394,6 +438,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
                   onChange={handleChange}
                   variant="outlined"
                   placeholder="https://example.com/image.jpg"
+                  disabled={!!editData.imageFile}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -412,7 +457,6 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
                       </InputAdornment>
                     ),
                   }}
-                  disabled={!!editData.imageFile}
                 />
                 <input
                   type="file"
@@ -429,7 +473,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
               options={branches}
               getOptionLabel={(option) => option.name}
               value={branches.filter(b => editData.branches.includes(b.id))}
-              onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
+              onChange={(_, value) => handleMultiSelect('branches', value)}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -442,7 +486,7 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
             <Autocomplete
               multiple
               options={services}
-              getOptionLabel={(option) => option.name}
+              getOptionLabel={(option) => option.name_ar}
               value={services.filter(s => editData.services_ids.includes(s.id))}
               onChange={(_, value) => handleMultiSelect('services', value)}
               renderInput={(params) => (
@@ -468,6 +512,17 @@ const OfferDialog: React.FC<OfferDialogProps> = ({
                   placeholder={editData.branches.length === 0 ? "اختر الفروع أولا" : "اختر الأطباء"}
                 />
               )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    label={option.name}
+                    {...getTagProps({ index })}
+                    key={option.id}
+                    size="small"
+                  />
+                ))
+              }
             />
           </Stack>
         )}
@@ -507,7 +562,9 @@ const OfferAddForm = () => {
     services_ids: [],
     doctors_ids: [],
     imageUrl: '',
-    imageFile: null
+    imageFile: null,
+    is_active: true,
+    priority: 0
   });
   
   const [editData, setEditData] = useState<OfferFormData>({
@@ -520,7 +577,9 @@ const OfferAddForm = () => {
     services_ids: [],
     doctors_ids: [],
     imageUrl: '',
-    imageFile: null
+    imageFile: null,
+    is_active: true,
+    priority: 0
   });
   
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -561,29 +620,55 @@ const OfferAddForm = () => {
     setCurrentOffer(offer);
     setDialogMode('edit');
     setDialogOpen(true);
+    
+    const branchIds = offer.branches.map(b => {
+      if (typeof b === 'object') return b.id;
+      return parseInt(b);
+    });
+
+    const serviceIds = offer.services_ids.map(s => {
+      if (typeof s === 'object') return s.id;
+      return s;
+    });
+
+    const doctorIds = offer.doctors_ids.map(d => {
+      if (typeof d === 'object') return d.id;
+      return d;
+    });
+
     setEditData({
       title: offer.title,
       description: offer.description,
       priceBefore: parseFloat(offer.priceBefore),
       priceAfter: parseFloat(offer.priceAfter),
       discountPercentage: parseFloat(offer.discountPercentage),
-      branches: offer.branches.map(b => parseInt(b)),
-      services_ids: offer.services_ids,
-      doctors_ids: offer.doctors_ids,
+      branches: branchIds,
+      services_ids: serviceIds,
+      doctors_ids: doctorIds,
       imageUrl: offer.image,
-      imageFile: null
+      imageFile: null,
+      is_active: Boolean(offer.is_active),
+      priority: offer.priority
     });
+    
     setImagePreview(offer.image ? 
       (offer.image.startsWith('http') ? offer.image : `https://www.ss.mastersclinics.com${offer.image}`) 
       : null);
+
+    if (branchIds.length > 0) {
+      const filtered = allDoctors.filter(doctor =>
+        doctor.branches.some(branchId => branchIds.includes(branchId))
+      );
+      setFilteredDoctors(filtered);
+    } else {
+      setFilteredDoctors([]);
+    }
   };
 
   const handleDeleteOffer = (id: number) => {
     setOfferToDelete(id);
     setDeleteConfirmOpen(true);
   };
-
-
 
   const confirmDelete = async () => {
     if (!offerToDelete) return;
@@ -632,11 +717,11 @@ const OfferAddForm = () => {
     const fetchInitialData = async () => {
       try {
         const [servicesRes, doctorsRes, branchesRes] = await Promise.all([
-          fetch('https://www.ss.mastersclinics.com/services', { headers: getAuthHeaders() }),
+          fetch('https://www.ss.mastersclinics.com/services/active', { headers: getAuthHeaders() }),
           fetch('https://www.ss.mastersclinics.com/doctors', { headers: getAuthHeaders() }),
           fetch('https://www.ss.mastersclinics.com/branches', { headers: getAuthHeaders() })
         ]);
-
+        
         const [servicesData, doctorsData, branchesData] = await Promise.all([
           servicesRes.json(),
           doctorsRes.json(),
@@ -645,14 +730,19 @@ const OfferAddForm = () => {
         
         setServices(servicesData.map((service: any) => ({
           id: service.id,
-          name: service.title,
-          department_id: service.department_id
+          name_ar: service.name_ar,
+          name_en: service.name_en,
+          department_id: service.department_id,
+          branches: service.branches,
+          description: service.description,
+          doctors_ids: service.doctors_ids,
+          is_active: service.is_active
         })));
 
         setAllDoctors(doctorsData.map((doctor: any) => ({
           id: doctor.id,
           name: doctor.name,
-          branches: doctor.branches_ids ? JSON.parse(doctor.branches_ids) : [],
+          branches: doctor.branch_id ? [doctor.branch_id] : [],
           department_id: doctor.department_id
         })));
         
@@ -674,91 +764,85 @@ const OfferAddForm = () => {
     fetchInitialData();
   }, []);
 
-const fetchOffers = async () => {
-  try {
-    const response = await fetch('https://www.ss.mastersclinics.com/offers', {
-      headers: getAuthHeaders()
-    });
-    const data = await response.json();
-    
-    const transformedOffers = data.map((offer: any) => {
-      // Ensure branches is always an array
-      let branchesArray = [];
-      if (Array.isArray(offer.branches)) {
-        branchesArray = offer.branches;
-      } else if (typeof offer.branches === 'string') {
-        try {
-          branchesArray = JSON.parse(offer.branches);
-        } catch {
-          branchesArray = offer.branches.split(',').filter(Boolean);
+  const fetchOffers = async () => {
+    try {
+      const response = await fetch('https://www.ss.mastersclinics.com/offers', {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      
+      const transformedOffers = data.map((offer: any) => {
+        let branchesArray = [];
+        if (Array.isArray(offer.branches)) {
+          branchesArray = offer.branches.map((b: any) => b.id.toString());
+        } else if (typeof offer.branches === 'string') {
+          try {
+            branchesArray = JSON.parse(offer.branches);
+          } catch {
+            branchesArray = offer.branches.split(',').filter(Boolean);
+          }
         }
-      } else if (offer.branches) {
-        branchesArray = [offer.branches];
-      }
 
-      // Ensure services_ids is always an array
-      let servicesArray = [];
-      if (Array.isArray(offer.services_ids)) {
-        servicesArray = offer.services_ids;
-      } else if (typeof offer.services_ids === 'string') {
-        try {
-          servicesArray = JSON.parse(offer.services_ids);
-        } catch {
-          servicesArray = offer.services_ids.split(',').filter(Boolean).map(Number);
+        let servicesArray = [];
+        if (Array.isArray(offer.services_ids)) {
+          servicesArray = offer.services_ids.map((s: any) => s.id);
+        } else if (typeof offer.services_ids === 'string') {
+          try {
+            servicesArray = JSON.parse(offer.services_ids);
+          } catch {
+            servicesArray = offer.services_ids.split(',').filter(Boolean).map(Number);
+          }
         }
-      } else if (offer.services_ids) {
-        servicesArray = [offer.services_ids];
-      }
 
-      // Ensure doctors_ids is always an array
-      let doctorsArray = [];
-      if (Array.isArray(offer.doctors_ids)) {
-        doctorsArray = offer.doctors_ids;
-      } else if (typeof offer.doctors_ids === 'string') {
-        try {
-          doctorsArray = JSON.parse(offer.doctors_ids);
-        } catch {
-          doctorsArray = offer.doctors_ids.split(',').filter(Boolean).map(Number);
+        let doctorsArray = [];
+        if (Array.isArray(offer.doctors_ids)) {
+          doctorsArray = offer.doctors_ids.map((d: any) => d.id);
+        } else if (typeof offer.doctors_ids === 'string') {
+          try {
+            doctorsArray = JSON.parse(offer.doctors_ids);
+          } catch {
+            doctorsArray = offer.doctors_ids.split(',').filter(Boolean).map(Number);
+          }
         }
-      } else if (offer.doctors_ids) {
-        doctorsArray = [offer.doctors_ids];
-      }
 
-      return {
-        ...offer,
-        branches: branchesArray.map(String), // Ensure all branches are strings
-        services_ids: servicesArray,
-        doctors_ids: doctorsArray,
-        image: offer.image || '',
-        priceBefore: offer.priceBefore?.toString() || '0',
-        priceAfter: offer.priceAfter?.toString() || '0',
-        discountPercentage: offer.discountPercentage?.toString() || '0',
-        createdAt: {
-          _seconds: Math.floor(new Date(offer.created_at || offer.createdAt?._seconds * 1000 || Date.now()).getTime() / 1000),
-          _nanoseconds: 0
-        }
-      };
-    });
-    
-    setOffers(transformedOffers);
-  } catch (error) {
-    console.error('Error fetching offers:', error);
-    setNotification({
-      open: true,
-      message: 'فشل تحميل قائمة العروض',
-      severity: 'error'
-    });
-  }
-};
+        return {
+          ...offer,
+          branches: branchesArray,
+          services_ids: servicesArray,
+          doctors_ids: doctorsArray,
+          image: offer.image || '',
+          priceBefore: offer.priceBefore?.toString() || '0',
+          priceAfter: offer.priceAfter?.toString() || '0',
+          discountPercentage: offer.discountPercentage?.toString() || '0',
+          is_active: Boolean(offer.is_active),
+          priority: offer.priority || 0,
+          createdAt: {
+            _seconds: Math.floor(new Date(offer.created_at).getTime() / 1000),
+            _nanoseconds: 0
+          }
+        };
+      });
+      
+      setOffers(transformedOffers);
+    } catch (error) {
+      console.error('Error fetching offers:', error);
+      setNotification({
+        open: true,
+        message: 'فشل تحميل قائمة العروض',
+        severity: 'error'
+      });
+    }
+  };
 
   useEffect(() => {
     if (formData.branches.length === 0) {
       setFilteredDoctors([]);
       setFormData(prev => ({ ...prev, doctors_ids: [] }));
     } else {
-      const filtered = allDoctors.filter(doctor =>
-        doctor.branches.some(branchId => formData.branches.includes(branchId))
-      );
+      const filtered = allDoctors.filter(doctor => {
+        const doctorBranches = Array.isArray(doctor.branches) ? doctor.branches : [];
+        return doctorBranches.some(branchId => formData.branches.includes(branchId));
+      });
       setFilteredDoctors(filtered);
     }
   }, [formData.branches, allDoctors]);
@@ -832,7 +916,7 @@ const fetchOffers = async () => {
     if (type === 'branches') {
       setFormData(prev => ({
         ...prev,
-        branches: values,
+        branches: values.map(v => v.id),
         doctors_ids: []
       }));
     } else if (type === 'services') {
@@ -848,119 +932,124 @@ const fetchOffers = async () => {
     }
   };
 
-const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const formPayload = new FormData();
-    formPayload.append('title', formData.title);
-    formPayload.append('description', formData.description);
-    formPayload.append('priceBefore', formData.priceBefore.toString());
-    formPayload.append('priceAfter', formData.priceAfter.toString());
-    formPayload.append('discountPercentage', formData.discountPercentage.toString());
-    formPayload.append('branches', JSON.stringify(formData.branches));
-    formPayload.append('services_ids', JSON.stringify(formData.services_ids));
-    formPayload.append('doctors_ids', JSON.stringify(formData.doctors_ids));
+    try {
+      const formPayload = new FormData();
+      formPayload.append('title', formData.title);
+      formPayload.append('description', formData.description);
+      formPayload.append('priceBefore', formData.priceBefore.toString());
+      formPayload.append('priceAfter', formData.priceAfter.toString());
+      formPayload.append('discountPercentage', formData.discountPercentage.toString());
+      formPayload.append('branches', JSON.stringify(formData.branches));
+      formPayload.append('services_ids', JSON.stringify(formData.services_ids));
+      formPayload.append('doctors_ids', JSON.stringify(formData.doctors_ids));
+      formPayload.append('is_active', formData.is_active ? '1' : '0');
+      formPayload.append('priority', formData.priority.toString());
 
-    // Handle image upload - either file or URL
-    if (formData.imageFile) {
-      formPayload.append('image', formData.imageFile);
-    } else if (formData.imageUrl) {
-      formPayload.append('imageUrl', formData.imageUrl);
+      if (formData.imageFile) {
+        formPayload.append('image', formData.imageFile);
+      } else if (formData.imageUrl) {
+        formPayload.append('imageUrl', formData.imageUrl);
+      }
+
+      const response = await fetch('https://www.ss.mastersclinics.com/offers', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formPayload,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create offer');
+      }
+
+      setNotification({
+        open: true,
+        message: 'تم إنشاء العرض بنجاح!',
+        severity: 'success'
+      });
+      
+      setFormData({
+        title: '',
+        description: '',
+        priceBefore: 0,
+        priceAfter: 0,
+        discountPercentage: 0,
+        branches: [],
+        services_ids: [],
+        doctors_ids: [],
+        imageUrl: '',
+        imageFile: null,
+        is_active: true,
+        priority: 0
+      });
+      setImagePreview(null);
+      await fetchOffers();
+      
+    } catch (error) {
+      console.error('Error creating offer:', error);
+      setNotification({
+        open: true,
+        message: error instanceof Error ? error.message : 'فشل إنشاء العرض',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const response = await fetch('https://www.ss.mastersclinics.com/offers', {
-      method: 'POST',
-      headers: getAuthHeaders(), // Don't set Content-Type for FormData
-      body: formPayload,
-    });
+  const handleSaveOffer = async (updatedOffer: Offer) => {
+    try {
+      const formPayload = new FormData();
+      formPayload.append('title', updatedOffer.title);
+      formPayload.append('description', updatedOffer.description);
+      formPayload.append('priceBefore', updatedOffer.priceBefore);
+      formPayload.append('priceAfter', updatedOffer.priceAfter);
+      formPayload.append('discountPercentage', updatedOffer.discountPercentage);
+      formPayload.append('branches', JSON.stringify(updatedOffer.branches));
+      formPayload.append('services_ids', JSON.stringify(updatedOffer.services_ids));
+      formPayload.append('doctors_ids', JSON.stringify(updatedOffer.doctors_ids));
+      formPayload.append('is_active', updatedOffer.is_active ? '1' : '0');
+      formPayload.append('priority', updatedOffer.priority.toString());
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create offer');
+      if (editData.imageFile) {
+        formPayload.append('image', editData.imageFile);
+      } else if (editData.imageUrl) {
+        formPayload.append('imageUrl', editData.imageUrl);
+      }
+
+      const response = await fetch(`https://www.ss.mastersclinics.com/offers/${updatedOffer.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: formPayload
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update offer');
+      }
+
+      setNotification({
+        open: true,
+        message: 'تم تحديث العرض بنجاح',
+        severity: 'success'
+      });
+      
+      await fetchOffers();
+      setDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating offer:', error);
+      setNotification({
+        open: true,
+        message: error instanceof Error ? error.message : 'فشل تحديث العرض',
+        severity: 'error'
+      });
     }
+  };
 
-    setNotification({
-      open: true,
-      message: 'Offer created successfully!',
-      severity: 'success'
-    });
-    
-    // Reset form
-    setFormData({
-      title: '',
-      description: '',
-      priceBefore: 0,
-      priceAfter: 0,
-      discountPercentage: 0,
-      branches: [],
-      services_ids: [],
-      doctors_ids: [],
-      imageUrl: '',
-      imageFile: null
-    });
-    setImagePreview(null);
-    await fetchOffers();
-    
-  } catch (error) {
-    console.error('Error creating offer:', error);
-    setNotification({
-      open: true,
-      message: error instanceof Error ? error.message : 'Failed to create offer',
-      severity: 'error'
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-const handleSaveOffer = async (updatedOffer: Offer) => {
-  try {
-    const formPayload = new FormData();
-    formPayload.append('title', updatedOffer.title);
-    formPayload.append('description', updatedOffer.description);
-    formPayload.append('priceBefore', updatedOffer.priceBefore);
-    formPayload.append('priceAfter', updatedOffer.priceAfter);
-    formPayload.append('discountPercentage', updatedOffer.discountPercentage);
-    formPayload.append('branches', JSON.stringify(updatedOffer.branches));
-    formPayload.append('services_ids', JSON.stringify(updatedOffer.services_ids));
-    formPayload.append('doctors_ids', JSON.stringify(updatedOffer.doctors_ids));
-
-    if (editData.imageFile) {
-      formPayload.append('image', editData.imageFile);
-    } else if (editData.imageUrl) {
-      formPayload.append('imageUrl', editData.imageUrl);
-    }
-
-    const response = await fetch(`https://www.ss.mastersclinics.com/offers/${updatedOffer.id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: formPayload
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to update offer');
-    }
-
-    setNotification({
-      open: true,
-      message: 'Offer updated successfully',
-      severity: 'success'
-    });
-    
-    await fetchOffers();
-    setDialogOpen(false);
-  } catch (error) {
-    console.error('Error updating offer:', error);
-    setNotification({
-      open: true,
-      message: error instanceof Error ? error.message : 'Failed to update offer',
-      severity: 'error'
-    });
-  }
-};
   if (fetching) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -1001,6 +1090,8 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                   <TableRow>
                     <TableCell>الصورة</TableCell>
                     <TableCell>العنوان</TableCell>
+                    <TableCell>الحالة</TableCell>
+                    <TableCell>الأولوية</TableCell>
                     <TableCell>السعر الأصلي</TableCell>
                     <TableCell>السعر بعد الخصم</TableCell>
                     <TableCell>الخصم</TableCell>
@@ -1028,14 +1119,24 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                             {offer.description.substring(0, 50)}...
                           </Typography>
                         </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={offer.is_active ? 'نشط' : 'غير نشط'} 
+                            color={offer.is_active ? 'success' : 'default'} 
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>{offer.priority}</TableCell>
                         <TableCell>{offer.priceBefore}ر.س</TableCell>
                         <TableCell>{offer.priceAfter}ر.س</TableCell>
                         <TableCell>{offer.discountPercentage}%</TableCell>
                         <TableCell>
-                          {offer.branches.slice(0, 2).map(branchId => {
-                            const branch = branches.find(b => b.id === parseInt(branchId));
-                            return branch ? (
-                              <Chip key={branch.id} label={branch.name} size="small" sx={{ m: 0.5 }} />
+                          {offer.branches.slice(0, 2).map(branch => {
+                            const branchObj = typeof branch === 'object' ? 
+                              branch : 
+                              branches.find(b => b.id === parseInt(branch));
+                            return branchObj ? (
+                              <Chip key={branchObj.id} label={branchObj.name} size="small" sx={{ m: 0.5 }} />
                             ) : null;
                           })}
                           {offer.branches.length > 2 && (
@@ -1066,7 +1167,7 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={10} align="center">
                         لا توجد عروض متاحة
                       </TableCell>
                     </TableRow>
@@ -1106,58 +1207,87 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                 variant="outlined"
               />
 
-            <Box>
-  <Typography variant="subtitle1" gutterBottom>Offer Image</Typography>
-  <Box display="flex" alignItems="center" gap={2}>
-    {imagePreview && (
-      <>
-        <img 
-          src={imagePreview}
-          alt="Preview"
-          style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: '4px' }}
-        />
-        <IconButton onClick={clearImageSelection} color="error">
-          <CloseIcon />
-        </IconButton>
-      </>
-    )}
-    <TextField
-      fullWidth
-      label="Image URL"
-      name="imageUrl"
-      value={formData.imageUrl}
-      onChange={handleChange}
-      variant="outlined"
-      placeholder="https://example.com/image.jpg"
-      disabled={!!formData.imageFile}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <Link />
-          </InputAdornment>
-        ),
-        endAdornment: (
-          <InputAdornment position="end">
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<CloudUpload />}
-            >
-              Upload Image
-              <input
-                type="file"
-                hidden
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-              />
-            </Button>
-          </InputAdornment>
-        ),
-      }}
-    />
-  </Box>
-</Box>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        is_active: e.target.checked
+                      }))}
+                      name="is_active"
+                      color="primary"
+                    />
+                  }
+                  label="العرض نشط"
+                  labelPlacement="start"
+                />
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="الأولوية"
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                  variant="outlined"
+                  inputProps={{ min: 0 }}
+                />
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle1" gutterBottom>صورة العرض</Typography>
+                <Box display="flex" alignItems="center" gap={2}>
+                  {imagePreview && (
+                    <>
+                      <img 
+                        src={imagePreview}
+                        alt="Preview"
+                        style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: '4px' }}
+                      />
+                      <IconButton onClick={clearImageSelection} color="error">
+                        <CloseIcon />
+                      </IconButton>
+                    </>
+                  )}
+                  <TextField
+                    fullWidth
+                    label="رابط الصورة"
+                    name="imageUrl"
+                    value={formData.imageUrl}
+                    onChange={handleChange}
+                    variant="outlined"
+                    placeholder="https://example.com/image.jpg"
+                    disabled={!!formData.imageFile}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Link />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<CloudUpload />}
+                          >
+                            رفع صورة
+                            <input
+                              type="file"
+                              hidden
+                              ref={fileInputRef}
+                              onChange={handleFileChange}
+                              accept="image/*"
+                            />
+                          </Button>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+              </Box>
 
               <Divider>
                 <Chip label="معلومات التسعير" />
@@ -1215,7 +1345,7 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                 options={branches}
                 getOptionLabel={(option) => option.name}
                 value={branches.filter(b => formData.branches.includes(b.id))}
-                onChange={(_, value) => handleMultiSelect('branches', value.map(v => v.id))}
+                onChange={(_, value) => handleMultiSelect('branches', value)}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1228,7 +1358,7 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
               <Autocomplete
                 multiple
                 options={services}
-                getOptionLabel={(option) => option.name}
+                getOptionLabel={(option) => option.name_ar}
                 value={services.filter(s => formData.services_ids.includes(s.id))}
                 onChange={(_, value) => handleMultiSelect('services', value)}
                 renderInput={(params) => (
@@ -1254,6 +1384,17 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                     placeholder={formData.branches.length === 0 ? "اختر الفروع أولا" : "اختر الأطباء"}
                   />
                 )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                      size="small"
+                    />
+                  ))
+                }
               />
 
               <Box display="flex" justifyContent="flex-end" gap={2} mt={4}>
@@ -1272,7 +1413,9 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
                       services_ids: [],
                       doctors_ids: [],
                       imageUrl: '',
-                      imageFile: null
+                      imageFile: null,
+                      is_active: true,
+                      priority: 0
                     });
                     setImagePreview(null);
                   }}
@@ -1294,20 +1437,20 @@ const handleSaveOffer = async (updatedOffer: Offer) => {
         </CardContent>
       </Card>
 
-    <OfferDialog
-  open={dialogOpen}
-  onClose={() => setDialogOpen(false)}
-  offer={currentOffer}
-  mode={dialogMode}
-  onSave={handleSaveOffer}
-  services={services}
-  branches={branches}
-  doctors={allDoctors}
-  editData={editData}
-  setEditData={setEditData}
-  imagePreview={imagePreview}
-  setImagePreview={setImagePreview}
-/>
+      <OfferDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        offer={currentOffer}
+        mode={dialogMode}
+        onSave={handleSaveOffer}
+        services={services}
+        branches={branches}
+        doctors={allDoctors}
+        editData={editData}
+        setEditData={setEditData}
+        imagePreview={imagePreview}
+        setImagePreview={setImagePreview}
+      />
 
       <Dialog
         open={deleteConfirmOpen}

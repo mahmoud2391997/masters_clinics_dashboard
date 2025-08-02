@@ -1,4 +1,5 @@
 export interface Blog {
+    created_at: string | number | Date;
     id: number;
     slug: string;
     title2: string;

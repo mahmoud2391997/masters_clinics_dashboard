@@ -3,23 +3,45 @@ import ServiceCard from "../../components/serviceCard";
 import { message, Select } from "antd";
 
 interface Service {
-  id: string;
-  title: string;
-  subtitle?: string;
-  description: string;
-  capabilities: string[];
-  approach: string;
+  id: number;
+  department_id: number;
+  category_id: number | null;
+  name_ar: string;
+  name_en: string | null;
+  description: string | null;
   doctors_ids: string[];
   branches: string[];
-  department_id?: number;
-  image?: string;
-  created_at?: string;
-  updated_at?: string;
+  image: string | null;
+  is_active: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+  department?: {
+    id: number;
+    name: string;
+  };
+  category?: {
+    id: number;
+    name: string;
+  };
+  doctors_ids_raw?: string;
+  branches_raw?: string;
 }
 
 interface Department {
   id: number;
   name: string;
+}
+
+interface Category {
+  id: number;
+  department_id: number;
+  name_ar: string;
+  name_en: string | null;
+  is_active: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Doctor {
@@ -32,75 +54,120 @@ interface Branch {
   name: string;
 }
 
-// دالة مساعدة لتحليل سلاسل JSON بأمان
-const safeJsonParse = (jsonString: string | null): any[] => {
-  if (!jsonString) return [];
-  
-  try {
-    // التعامل مع الحالات حيث قد يكون JSON مغلفًا بعلامات اقتباس
-    const trimmed = jsonString.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-      return JSON.parse(JSON.parse(trimmed));
+const safeJsonParse = (input: any): any[] => {
+  // Handle null/undefined cases
+  if (input === null || input === undefined) {
+    return [];
+  }
+
+  // If input is already an array, return it directly
+  if (Array.isArray(input)) {
+    return input;
+  }
+
+  // Handle non-string values (numbers, booleans, objects)
+  if (typeof input !== 'string') {
+    try {
+      // Try to stringify and parse non-string values
+      const stringified = JSON.stringify(input);
+      const parsed = JSON.parse(stringified);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
-    return JSON.parse(trimmed);
+  }
+
+  // Handle empty string cases
+  const trimmed = input.trim();
+  if (trimmed === '' || trimmed === '[]' || trimmed === '""') {
+    return [];
+  }
+
+  try {
+    // Handle string that might be double-encoded
+    let parsedValue = input;
+    
+    // First try to parse the outer string
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      parsedValue = JSON.parse(trimmed);
+    }
+    
+    // If the result is still a string, try parsing again
+    if (typeof parsedValue === 'string') {
+      try {
+        parsedValue = JSON.parse(parsedValue);
+      } catch {
+        // If it fails, try to handle as a single string value
+        if (parsedValue.startsWith('[') && parsedValue.endsWith(']')) {
+          try {
+            parsedValue = JSON.parse(parsedValue);
+          } catch {
+            return [];
+          }
+        } else {
+          // Handle as single value in array
+          return [parsedValue];
+        }
+      }
+    }
+    
+    return Array.isArray(parsedValue) ? parsedValue : [];
   } catch (e) {
-    console.error('فشل في تحليل JSON:', jsonString);
+    console.error('Failed to parse input:', input, e);
     return [];
   }
 };
-
 export default function AddService() {
-  // حالة النموذج
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
+  const [name_ar, setNameAr] = useState("");
+  const [name_en, setNameEn] = useState("");
   const [description, setDescription] = useState("");
-  const [capabilities, setCapabilities] = useState<string[]>([]);
-  const [approach, setApproach] = useState("");
   const [departmentId, setDepartmentId] = useState<number | undefined>();
-  const [newCapability, setNewCapability] = useState("");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [is_active, setIsActive] = useState(1);
+  const [priority, setPriority] = useState(0);
 
-  // حالة الوسائط
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>("");
   
-  // حالة التحديد
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [selectedDoctors, setSelectedDoctors] = useState<string[]>([]);
 
-  // حالة البيانات
   const [services, setServices] = useState<Service[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
   const [allBranches, setAllBranches] = useState<Branch[]>([]);
 
-  // حالة واجهة المستخدم
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isLoading, setIsLoading] = useState({
     services: false,
     departments: false,
+    categories: false,
     doctors: false,
     branches: false
   });
 
-  // تحميل البيانات الأولية
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading({
           services: true,
           departments: true,
+          categories: true,
           doctors: true,
           branches: true
         });
 
-        // جلب جميع البيانات بالتوازي
-        const [servicesRes, departmentsRes, doctorsRes, branchesRes] = await Promise.all([
+        const [servicesRes, departmentsRes, categoriesRes, doctorsRes, branchesRes] = await Promise.all([
           fetch("https://www.ss.mastersclinics.com/services", {
             headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
           }),
           fetch("https://www.ss.mastersclinics.com/departments", {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
+          }),
+          fetch("https://www.ss.mastersclinics.com/service-categories", {
             headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
           }),
           fetch("https://www.ss.mastersclinics.com/doctors", {
@@ -111,38 +178,53 @@ export default function AddService() {
           })
         ]);
 
-        if (!servicesRes.ok) throw new Error("فشل تحميل الخدمات");
-        if (!departmentsRes.ok) throw new Error("فشل تحميل الأقسام");
-        if (!doctorsRes.ok) throw new Error("فشل تحميل الأطباء");
-        if (!branchesRes.ok) throw new Error("فشل تحميل الفروع");
+        if (!servicesRes.ok) throw new Error("Failed to load services");
+        if (!departmentsRes.ok) throw new Error("Failed to load departments");
+        if (!categoriesRes.ok) throw new Error("Failed to load categories");
+        if (!doctorsRes.ok) throw new Error("Failed to load doctors");
+        if (!branchesRes.ok) throw new Error("Failed to load branches");
 
         const servicesData = await servicesRes.json();
+        console.log(servicesData);
+        
         const departmentsData = await departmentsRes.json();
+        const categoriesData = await categoriesRes.json();
+        console.log(categoriesData);
+        
         const doctorsData = await doctorsRes.json();
         const branchesData = await branchesRes.json();
+const normalizedServices = servicesData.map((service: any) => {
+  // Handle branches - first try raw, then regular
+  const branches = service.branches_raw 
+    ? safeJsonParse(service.branches_raw)
+    : safeJsonParse(service.branches || '[]');
+  
+  // Handle doctors_ids - first try raw, then regular
+  const doctors_ids = service.doctors_ids_raw 
+    ? safeJsonParse(service.doctors_ids_raw)
+    : safeJsonParse(service.doctors_ids || '[]');
 
-        // توحيد بيانات الخدمات
-        const normalizedServices = servicesData.map((service: any) => ({
-          ...service,
-          id: String(service.id),
-          branches: safeJsonParse(service.branches_raw || service.branches),
-          doctors_ids: safeJsonParse(service.doctors_ids_raw || service.doctors_ids).map(String),
-          capabilities: safeJsonParse(service.capabilities),
-          department_id: service.department_id || undefined
-        }));
+  return {
+    ...service,
+    branches: branches.map(String), // Ensure all are strings
+    doctors_ids: doctors_ids.map(String), // Ensure all are strings
+  };
+});
 
         setServices(normalizedServices);
         setDepartments(departmentsData);
+        setCategories(categoriesData);
         setAllDoctors(doctorsData.map((d: any) => ({ ...d, id: String(d.id) })));
         setAllBranches(branchesData.map((b: any) => ({ ...b, id: String(b.id) })));
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : "فشل تحميل البيانات");
-        console.error("خطأ في جلب البيانات:", err);
+        setError(err instanceof Error ? err.message : "Failed to load data");
+        console.error("Error fetching data:", err);
       } finally {
         setIsLoading({
           services: false,
           departments: false,
+          categories: false,
           doctors: false,
           branches: false
         });
@@ -152,19 +234,27 @@ export default function AddService() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (departmentId) {
+      const deptCategories = categories.filter(cat => cat.department_id === departmentId);
+      setCategories(deptCategories);
+      setCategoryId(null);
+    }
+  }, [departmentId, categories]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const validTypes = ["image/jpeg", "image/png", "image/gif"];
     if (!validTypes.includes(file.type)) {
-      setError("يرجى رفع صورة بصيغة صحيحة (JPEG, PNG, GIF)");
+      setError("Please upload a valid image (JPEG, PNG, GIF)");
       return;
     }
 
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError("حجم الصورة يجب أن يكون أقل من 5 ميجا");
+      setError("Image size should be less than 5MB");
       return;
     }
 
@@ -179,12 +269,13 @@ export default function AddService() {
   };
 
   const resetForm = () => {
-    setTitle("");
-    setSubtitle("");
+    setNameAr("");
+    setNameEn("");
     setDescription("");
-    setCapabilities([]);
-    setApproach("");
     setDepartmentId(undefined);
+    setCategoryId(null);
+    setIsActive(1);
+    setPriority(0);
     setImageFile(null);
     setImagePreview(undefined);
     setSelectedBranches([]);
@@ -193,30 +284,20 @@ export default function AddService() {
     setEditingService(null);
   };
 
-  const handleAddCapability = () => {
-    if (newCapability.trim()) {
-      setCapabilities([...capabilities, newCapability.trim()]);
-      setNewCapability("");
-    }
-  };
-
-  const handleRemoveCapability = (index: number) => {
-    setCapabilities(capabilities.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(prev => ({...prev, services: true}));
 
     const formData = new FormData();
-    formData.append("title", title);
-    formData.append("subtitle", subtitle || "");
-    formData.append("description", description);
-    formData.append("capabilities", JSON.stringify(capabilities));
-    formData.append("approach", approach);
+    formData.append("name_ar", name_ar);
+    formData.append("name_en", name_en || "");
+    formData.append("description", description || "");
     formData.append("doctors_ids", JSON.stringify(selectedDoctors));
     formData.append("branches", JSON.stringify(selectedBranches));
     if (departmentId) formData.append("department_id", departmentId.toString());
+    if (categoryId) formData.append("category_id", categoryId.toString());
+    formData.append("is_active", is_active.toString());
+    formData.append("priority", priority.toString());
     if (imageFile) formData.append("image", imageFile);
 
     try {
@@ -236,17 +317,14 @@ export default function AddService() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || (isEditing ? "فشل تحديث الخدمة" : "فشل إضافة الخدمة"));
+        throw new Error(errorData.message || (isEditing ? "Failed to update service" : "Failed to add service"));
       }
 
       const savedService = await response.json();
       const normalizedService = {
         ...savedService,
-        id: String(savedService.id),
         branches: safeJsonParse(savedService.branches_raw || savedService.branches),
         doctors_ids: safeJsonParse(savedService.doctors_ids_raw || savedService.doctors_ids).map(String),
-        capabilities: safeJsonParse(savedService.capabilities),
-        department_id: savedService.department_id || undefined
       };
 
       setServices(prev => 
@@ -256,17 +334,17 @@ export default function AddService() {
       );
 
       resetForm();
-      message.success(isEditing ? "تم تحديث الخدمة بنجاح" : "تم إضافة الخدمة بنجاح");
+      message.success(isEditing ? "Service updated successfully" : "Service added successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل حفظ الخدمة");
+      setError(err instanceof Error ? err.message : "Failed to save service");
       console.error(err);
     } finally {
       setIsLoading(prev => ({...prev, services: false}));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذه الخدمة؟")) return;
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this service?")) return;
 
     try {
       const response = await fetch(`https://www.ss.mastersclinics.com/services/${id}`, {
@@ -276,17 +354,17 @@ export default function AddService() {
         }
       });
 
-      if (!response.ok) throw new Error("فشل حذف الخدمة");
+      if (!response.ok) throw new Error("Failed to delete service");
 
       setServices(prev => prev.filter(service => service.id !== id));
-      message.success("تم حذف الخدمة بنجاح");
+      message.success("Service deleted successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "فشل حذف الخدمة");
+      setError(err instanceof Error ? err.message : "Failed to delete service");
       console.error(err);
     }
   };
 
-  return (
+   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6" dir="rtl">
       {error && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
@@ -303,81 +381,36 @@ export default function AddService() {
         </h2>
 
         <div>
-          <label className="block text-gray-700">العنوان*</label>
+          <label className="block text-gray-700">الاسم بالعربية*</label>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={name_ar}
+            onChange={(e) => setNameAr(e.target.value)}
             className="w-full border px-3 py-2 rounded"
             required
           />
         </div>
 
         <div>
-          <label className="block text-gray-700">العنوان الفرعي</label>
+          <label className="block text-gray-700">الاسم بالإنجليزية</label>
           <input
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
+            value={name_en}
+            onChange={(e) => setNameEn(e.target.value)}
             className="w-full border px-3 py-2 rounded"
           />
         </div>
 
         <div>
-          <label className="block text-gray-700">الوصف*</label>
+          <label className="block text-gray-700">الوصف</label>
           <textarea
-            value={description}
+            value={description || ""}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full border px-3 py-2 rounded"
             rows={4}
-            required
           />
         </div>
 
         <div>
-          <label className="block text-gray-700">المميزات</label>
-          <div className="flex gap-2 mb-2">
-            <input
-              value={newCapability}
-              onChange={(e) => setNewCapability(e.target.value)}
-              className="flex-1 border px-3 py-2 rounded"
-              placeholder="أضف مميزة جديدة"
-            />
-            <button
-              type="button"
-              onClick={handleAddCapability}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              إضافة
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {capabilities.map((cap, index) => (
-              <div key={index} className="bg-gray-100 px-3 py-1 rounded-full flex items-center">
-                {cap}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveCapability(index)}
-                  className="mr-2 text-red-500"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-gray-700">النهج المتبع*</label>
-          <textarea
-            value={approach}
-            onChange={(e) => setApproach(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-            rows={4}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-700">القسم</label>
+          <label className="block text-gray-700">القسم*</label>
           <Select
             value={departmentId}
             onChange={(value) => setDepartmentId(value)}
@@ -387,7 +420,48 @@ export default function AddService() {
               label: dep.name
             }))}
             placeholder="اختر القسم"
-            allowClear
+            loading={isLoading.departments}
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">التصنيف</label>
+          <Select
+            value={categoryId}
+            onChange={(value) => setCategoryId(value)}
+            className="w-full"
+            options={categories
+              .filter(cat => !departmentId || cat.department_id === departmentId)
+              .map(cat => ({
+                value: cat.id,
+                label: cat.name_ar
+              }))}
+            placeholder="اختر التصنيف"
+            loading={isLoading.categories}
+            disabled={!departmentId}
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">الحالة</label>
+          <Select
+            value={is_active}
+            onChange={(value) => setIsActive(value)}
+            className="w-full"
+            options={[
+              { value: 1, label: "مفعل" },
+              { value: 0, label: "غير مفعل" }
+            ]}
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">الأولوية</label>
+          <input
+            type="number"
+            value={priority}
+            onChange={(e) => setPriority(Number(e.target.value))}
+            className="w-full border px-3 py-2 rounded"
           />
         </div>
 
@@ -473,45 +547,59 @@ export default function AddService() {
           <p className="text-gray-500">لا توجد خدمات مضافة</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {services.map((service) => (
-              <ServiceCard
-                key={service.id}
-                category={{
-                  id: service.id,
-                  name: service.title,
-                  description: service.description,
-                  imageUrl: service.image ? `https://www.ss.mastersclinics.com${service.image}` : "",
-                  capabilities: service.capabilities,
-                  approach: service.approach,
-                  doctors: service.doctors_ids.map(id => {
-                    const doctor = allDoctors.find(d => d.id === id);
-                    return { id, name: doctor?.name || "غير معروف" };
-                  }),
-                  branches: service.branches.map(id => {
-                    const branch = allBranches.find(b => b.id === id);
-                    return { id, name: branch?.name || "غير معروف" };
-                  }),
-                  department: service.department_id 
-                    ? departments.find(d => d.id === service.department_id)?.name
-                    : undefined
-                }}
-                handleEdit={() => {
-                  setIsEditing(true);
-                  setEditingService(service);
-                  setTitle(service.title);
-                  setSubtitle(service.subtitle || "");
-                  setDescription(service.description);
-                  setCapabilities(service.capabilities);
-                  setApproach(service.approach);
-                  setDepartmentId(service.department_id);
-                  setSelectedBranches(service.branches);
-                  setSelectedDoctors(service.doctors_ids);
-                  setImagePreview(service.image ? `https://www.ss.mastersclinics.com${service.image}` : undefined);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                handleDelete={() => handleDelete(service.id)}
-              />
-            ))}
+            {services.map((service) => {
+              const serviceCategory = categories.find(cat => cat.id === service.category_id);
+              const serviceDepartment = departments.find(dep => dep.id === service.department_id);
+              
+              const serviceDoctors = service.doctors_ids
+                .map(id => allDoctors.find(d => d.id === id))
+                .filter(Boolean) as Doctor[];
+                
+              const serviceBranches = service.branches
+                .map(id => allBranches.find(b => b.id === id))
+                .filter(Boolean) as Branch[];
+
+              return (
+                <ServiceCard
+                  key={service.id}
+                  service={{
+                    id: service.id,
+                    name_ar: service.name_ar,
+                    name_en: service.name_en,
+                    description: service.description,
+                    image: service.image,
+                    is_active: service.is_active,
+                    priority: service.priority,
+                    created_at: service.created_at,
+                    updated_at: service.updated_at,
+                    department: serviceDepartment,
+                    category: serviceCategory ? {
+                      id: serviceCategory.id,
+                      name_ar: serviceCategory.name_ar,
+                      name_en: serviceCategory.name_en
+                    } : undefined,
+                    doctors: serviceDoctors,
+                    branches: serviceBranches
+                  }}
+                  onEdit={() => {
+                    setIsEditing(true);
+                    setEditingService(service);
+                    setNameAr(service.name_ar);
+                    setNameEn(service.name_en || "");
+                    setDescription(service.description || "");
+                    setDepartmentId(service.department_id);
+                    setCategoryId(service.category_id);
+                    setIsActive(service.is_active);
+                    setPriority(service.priority);
+                    setSelectedBranches(service.branches);
+                    setSelectedDoctors(service.doctors_ids);
+                    setImagePreview(service.image ? `https://www.ss.mastersclinics.com${service.image}` : undefined);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onDelete={() => handleDelete(service.id)}
+                />
+              );
+            })}
           </div>
         )}
       </div>

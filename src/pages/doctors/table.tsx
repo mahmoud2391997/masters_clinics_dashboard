@@ -1,67 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Table,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableCell,
-  Paper,
-  Box,
-  TextField,
-  Typography,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Stack,
-  TableBody,
-  Checkbox,
-  MenuItem,
-  LinearProgress,
-  CircularProgress,
-  IconButton
+  Table, TableContainer, TableHead, TableRow, TableCell, Paper,
+  Box, TextField, Typography, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions, Stack, LinearProgress, CircularProgress,
+  IconButton, MenuItem, FormControl, InputLabel, Select,
+  Switch, FormControlLabel,
+  TableBody
 } from '@mui/material';
-import { Add, Save, Delete } from '@mui/icons-material';
+import { Add,  Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-
-interface WorkingHoursSlot {
-  days: string[];
-  openingTime: string;
-  closingTime: string;
-}
 
 interface Doctor {
   id: number;
   name: string;
-  title?: string;
-  description?: string;
-  position?: string;
-  practice_area?: string;
-  experience?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  personal_experience?: string;
-  education: string[];
-  skills: string[];
-  achievements: string[];
-  working_hours: WorkingHoursSlot[];
-  branches_ids: number[];
+  specialty: string;
+  branch_id: number;
   department_id: number;
+  services: string;
   image: string | null;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-interface Branch {
-  id: number;
-  name: string;
-}
-
-interface Department {
-  id: number;
-  name: string;
-}
+interface Branch { id: number; name: string; }
+interface Department { id: number; name: string; }
 
 const DoctorTable: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -71,545 +36,219 @@ const DoctorTable: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [doctorToDelete, setDoctorToDelete] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
-
   const [newDoctor, setNewDoctor] = useState<Partial<Doctor>>({
-    name: '',
-    title: '',
-    description: '',
-    position: '',
-    practice_area: '',
-    experience: '',
-    address: '',
-    phone: '',
-    email: '',
-    personal_experience: '',
-    education: [],
-    skills: [],
-    achievements: [],
-    working_hours: [],
-    branches_ids: [],
-    department_id: 0,
-    image: null,
+    name: '', specialty: '', branch_id: 0, department_id: 0,
+    services: '', image: null, priority: 0, is_active: true
   });
-
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
   const [branchOptions, setBranchOptions] = useState<Branch[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<Department[]>([]);
 
   useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const response = await axios.get<Doctor[]>('https://www.ss.mastersclinics.com/doctors', {
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-          },
-        });
-        setDoctors(response.data);
-        setFilteredDoctors(response.data);
-      } catch (err) {
-        setError('فشل في تحميل بيانات الأطباء');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDoctors();
-  }, []);
-
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [branchesRes, departmentsRes] = await Promise.all([
-          axios.get<Branch[]>('https://www.ss.mastersclinics.com/branches', {
-            headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
-          }),
-          axios.get<Department[]>('https://www.ss.mastersclinics.com/departments', {
-            headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
-          }),
-        ]);
-        setBranchOptions(branchesRes.data);
-        setDepartmentOptions(departmentsRes.data);
-      } catch (err) {
-        console.error('فشل في تحميل الفروع أو الأقسام', err);
-      }
-    };
     fetchOptions();
   }, []);
 
+  const fetchDoctors = async () => {
+    try {
+      const resp = await axios.get<Doctor[]>('https://www.ss.mastersclinics.com/doctors', {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
+      });
+      console.log(resp.data);
+      
+      setDoctors(resp.data);
+      setFilteredDoctors(resp.data);
+    } catch (err) { console.error(err); setError('فشل تحميل الأطباء'); }
+    finally { setLoading(false); }
+  };
+
+  const fetchOptions = async () => {
+    try {
+      const [b, d] = await Promise.all([
+        axios.get<Branch[]>('https://www.ss.mastersclinics.com/branches', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } }),
+        axios.get<Department[]>('https://www.ss.mastersclinics.com/departments', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } }),
+      ]);
+      setBranchOptions(b.data);
+      setDepartmentOptions(d.data);
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => {
-    const filtered = doctors.filter(doctor =>
-      doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (doctor.title && doctor.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doctor.practice_area && doctor.practice_area.toLowerCase().includes(searchQuery.toLowerCase()))
+    const f = doctors.filter(doc =>
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (doc.specialty && doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-    setFilteredDoctors(filtered);
+    setFilteredDoctors(f);
   }, [searchQuery, doctors]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewDoctor(prev => ({ ...prev, [name]: value }));
+    setNewDoctor(prev => ({ ...prev, [name]: name === 'priority' ? Number(value) : value }));
   };
-
-  const handleListChange = (name: keyof Doctor, value: string) => {
-    setNewDoctor(prev => ({ ...prev, [name]: value.split(',').map(item => item.trim()) }));
+  const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewDoctor(prev => ({ ...prev, is_active: e.target.checked }));
+  };
+  const handleSelectChange = (e: any) => {
+    const { name, value } = e.target;
+    setNewDoctor(prev => ({ ...prev, [name]: Number(value) }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
+    if (e.target.files?.[0]) {
+      setImageFile(e.target.files[0]);
       const reader = new FileReader();
-      reader.onload = (event) => {
-        setImagePreview(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      reader.onload = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(e.target.files[0]);
     }
   };
 
   const handleSubmit = async () => {
-    if (!newDoctor.name) {
-      setError('الاسم مطلوب');
-      return;
-    }
-
+    if (!newDoctor.name) { setError('الاسم مطلوب'); return; }
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('name', newDoctor.name);
-      formData.append('title', newDoctor.title || '');
-      formData.append('description', newDoctor.description || '');
-      formData.append('position', newDoctor.position || '');
-      formData.append('practice_area', newDoctor.practice_area || '');
-      formData.append('experience', newDoctor.experience || '');
-      formData.append('address', newDoctor.address || '');
-      formData.append('phone', newDoctor.phone || '');
-      formData.append('email', newDoctor.email || '');
-      formData.append('personal_experience', newDoctor.personal_experience || '');
-      formData.append('education', JSON.stringify(newDoctor.education || []));
-      formData.append('skills', JSON.stringify(newDoctor.skills || []));
-      formData.append('achievements', JSON.stringify(newDoctor.achievements || []));
-      formData.append('working_hours', JSON.stringify(newDoctor.working_hours || []));
-      formData.append('branches_ids', JSON.stringify(newDoctor.branches_ids || []));
-      formData.append('department_id', newDoctor.department_id?.toString() || '');
-
-      if (imageFile) {
-        formData.append('image', imageFile);
-      }
-
-      const response = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      Object.entries(newDoctor).forEach(([k, v]) => {
+        if (v !== undefined) formData.append(k, String(v));
       });
-
-      setDoctors(prev => [...prev, response.data]);
-      setFilteredDoctors(prev => [...prev, response.data]);
-      setOpenAddDialog(false);
-      resetForm();
-    } catch (err) {
-      setError('فشل في إضافة الطبيب');
-      console.error(err);
-    } finally {
-      setSubmitting(false);
-    }
+      if (imageFile) formData.append('image', imageFile);
+      const resp = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}`, 'Content-Type': 'multipart/form-data' }
+      });
+      setDoctors(prev => [...prev, resp.data]);
+      setFilteredDoctors(prev => [...prev, resp.data]);
+      setOpenAddDialog(false); resetForm();
+    } catch (err) { console.error(err); setError('فشل إضافة الطبيب'); }
+    finally { setSubmitting(false); }
   };
 
   const resetForm = () => {
-    setNewDoctor({
-      name: '',
-      title: '',
-      description: '',
-      position: '',
-      practice_area: '',
-      experience: '',
-      address: '',
-      phone: '',
-      email: '',
-      personal_experience: '',
-      education: [],
-      skills: [],
-      achievements: [],
-      working_hours: [],
-      branches_ids: [],
-      department_id: 0,
-      image: null,
-    });
-    setImageFile(null);
-    setImagePreview(null);
+    setNewDoctor({ name: '', specialty: '', branch_id: 0, department_id: 0, services: '', image: null, priority: 0, is_active: true });
+    setImageFile(null); setImagePreview(null);
   };
 
-  const handleDeleteClick = (doctorId: number) => {
-    setDoctorToDelete(doctorId);
-    setDeleteDialogOpen(true);
+  const handleDeleteClick = (id: number) => {
+    setDoctorToDelete(id); setDeleteDialogOpen(true);
   };
-
   const handleConfirmDelete = async () => {
     if (!doctorToDelete) return;
-
     setDeleting(true);
     try {
       await axios.delete(`https://www.ss.mastersclinics.com/doctors/${doctorToDelete}`, {
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-        },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
       });
-
-      setDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
-      setFilteredDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
-      
+      setDoctors(prev => prev.filter(d => d.id !== doctorToDelete));
+      setFilteredDoctors(prev => prev.filter(d => d.id !== doctorToDelete));
       setDeleteDialogOpen(false);
-    } catch (err) {
-      setError('فشل في حذف الطبيب');
-      console.error(err);
-    } finally {
-      setDeleting(false);
-      setDoctorToDelete(null);
-    }
+    } catch (err) { console.error(err); setError('فشل الحذف'); }
+    finally { setDeleting(false); setDoctorToDelete(null); }
   };
 
-  const getBranchName = (id: number) => {
-    const branch = branchOptions.find(b => b.id === id);
-    return branch ? branch.name : id.toString();
-  };
-
-  const getDepartmentName = (id: number) => {
-    const dept = departmentOptions.find(d => d.id === id);
-    return dept ? dept.name : '-';
-  };
+  const getBranchName = (id: number) => branchOptions.find(b => b.id === id)?.name || '';
+  const getDepartmentName = (id: number) => departmentOptions.find(d => d.id === id)?.name || '';
 
   return (
     <Box dir="rtl" className="p-5">
       <Box display="flex" gap={2} mb={2}>
         <TextField
-          fullWidth
-          label="بحث بالاسم أو اللقب أو التخصص"
-          variant="outlined"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          fullWidth label="ابحث بالاسم أو التخصص" variant="outlined"
+          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <Button 
-          variant="contained" 
-          startIcon={<Add />} 
-          onClick={() => setOpenAddDialog(true)}
-        >
+        <Button variant="contained" startIcon={<Add />} onClick={() => setOpenAddDialog(true)}>
           إضافة طبيب
         </Button>
       </Box>
-
-      {error && (
-        <Box mb={2}>
-          <Typography color="error">{error}</Typography>
-        </Box>
-      )}
-
+      {error && <Typography color="error" mb={2}>{error}</Typography>}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell align="center">الاسم</TableCell>
-              <TableCell align="center">اللقب</TableCell>
-              <TableCell align="center">المنصب</TableCell>
               <TableCell align="center">التخصص</TableCell>
+              <TableCell align="center">الفرع</TableCell>
               <TableCell align="center">القسم</TableCell>
-              <TableCell align="center">الهاتف</TableCell>
-              <TableCell align="center">البريد الإلكتروني</TableCell>
+              <TableCell align="center">الخدمات</TableCell>
+              <TableCell align="center">الأولوية</TableCell>
+              <TableCell align="center">نشط</TableCell>
               <TableCell align="center">الإجراءات</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <LinearProgress />
-                </TableCell>
-              </TableRow>
-            ) : filteredDoctors.length > 0 ? (
-              filteredDoctors.map((doctor) => (
-                <TableRow key={doctor.id}>
-                  <TableCell align="center">{doctor.name}</TableCell>
-                  <TableCell align="center">{doctor.title || '-'}</TableCell>
-                  <TableCell align="center">{doctor.position || '-'}</TableCell>
-                  <TableCell align="center">{doctor.practice_area || '-'}</TableCell>
-                  <TableCell align="center">{getDepartmentName(doctor.department_id)}</TableCell>
-                  <TableCell align="center">{doctor.phone || '-'}</TableCell>
-                  <TableCell align="center">{doctor.email || '-'}</TableCell>
+              <TableRow><TableCell colSpan={8} align="center"><LinearProgress/></TableCell></TableRow>
+            ) : filteredDoctors.length ? (
+              filteredDoctors.map(doc => (
+                <TableRow key={doc.id}>
+                  <TableCell align="center">{doc.name}</TableCell>
+                  <TableCell align="center">{doc.specialty || '-'}</TableCell>
+                  <TableCell align="center">{getBranchName(doc.branch_id)}</TableCell>
+                  <TableCell align="center">{getDepartmentName(doc.department_id)}</TableCell>
+                  <TableCell align="center">{doc.services?.substring(0,50)+'...'}</TableCell>
+                  <TableCell align="center">{doc.priority}</TableCell>
+                  <TableCell align="center">{doc.is_active ? 'نعم' : 'لا'}</TableCell>
                   <TableCell align="center">
                     <Stack direction="row" spacing={1} justifyContent="center">
-                      <Link to={`/doctors/${doctor.id}`}>
-                        <Button variant="outlined" size="small">عرض</Button>
-                      </Link>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDeleteClick(doctor.id)}
-                      >
-                        <Delete />
-                      </IconButton>
+                      <Link to={`/doctors/${doc.id}`}><Button variant="outlined" size="small">عرض</Button></Link>
+                      <IconButton color="error" onClick={() => handleDeleteClick(doc.id)}><Delete/></IconButton>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={8} align="center">لا توجد بيانات</TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={8} align="center">لا توجد بيانات</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>تأكيد الحذف</DialogTitle>
-        <DialogContent>
-          <Typography>هل أنت متأكد من رغبتك في حذف هذا الطبيب؟</Typography>
-        </DialogContent>
+        <DialogContent><Typography>هل تريد حذف هذا الطبيب؟</Typography></DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => setDeleteDialogOpen(false)}
-            color="primary"
-            disabled={deleting}
-          >
-            إلغاء
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="error"
-            disabled={deleting}
-            startIcon={deleting ? <CircularProgress size={20} /> : null}
-          >
-            {deleting ? 'جاري الحذف...' : 'حذف'}
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>إلغاء</Button>
+          <Button onClick={handleConfirmDelete} color="error" disabled={deleting}>
+            {deleting ? <CircularProgress size={20}/> : 'حذف'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Add Doctor Dialog */}
-      <Dialog 
-        open={openAddDialog} 
-        onClose={() => {
-          setOpenAddDialog(false);
-          resetForm();
-        }} 
-        fullWidth 
-        maxWidth="md"
-      >
+      <Dialog open={openAddDialog} onClose={() => { setOpenAddDialog(false); resetForm(); }} fullWidth maxWidth="md">
         <DialogTitle>إضافة طبيب جديد</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={3} sx={{ pt: 2 }}>
-            <TextField
-              label="الاسم *"
-              name="name"
-              value={newDoctor.name}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="اللقب"
-              name="title"
-              value={newDoctor.title}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="الوصف"
-              name="description"
-              value={newDoctor.description}
-              onChange={handleInputChange}
-              multiline
-              rows={3}
-              fullWidth
-            />
-
-            <TextField
-              label="المنصب"
-              name="position"
-              value={newDoctor.position}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="التخصص"
-              name="practice_area"
-              value={newDoctor.practice_area}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="الخبرة"
-              name="experience"
-              value={newDoctor.experience}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="العنوان"
-              name="address"
-              value={newDoctor.address}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="الهاتف"
-              name="phone"
-              value={newDoctor.phone}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="البريد الإلكتروني"
-              name="email"
-              value={newDoctor.email}
-              onChange={handleInputChange}
-              fullWidth
-            />
-
-            <TextField
-              label="الخبرة الشخصية"
-              name="personal_experience"
-              value={newDoctor.personal_experience}
-              onChange={handleInputChange}
-              multiline
-              rows={3}
-              fullWidth
-            />
-
-            <TextField
-              label="التعليم (مفصولة بفاصلة)"
-              value={newDoctor.education?.join(', ') || ''}
-              onChange={(e) => handleListChange('education', e.target.value)}
-              fullWidth
-            />
-
-            <TextField
-              label="المهارات (مفصولة بفاصلة)"
-              value={newDoctor.skills?.join(', ') || ''}
-              onChange={(e) => handleListChange('skills', e.target.value)}
-              fullWidth
-            />
-
-            <TextField
-              label="الإنجازات (مفصولة بفاصلة)"
-              value={newDoctor.achievements?.join(', ') || ''}
-              onChange={(e) => handleListChange('achievements', e.target.value)}
-              fullWidth
-            />
-
+          <Stack spacing={3} pt={2}>
+            <TextField label="الاسم" name="name" value={newDoctor.name} onChange={handleInputChange} fullWidth />
+            <TextField label="التخصص" name="specialty" value={newDoctor.specialty} onChange={handleInputChange} fullWidth />
+            <TextField label="الخدمات" name="services" value={newDoctor.services} onChange={handleInputChange} multiline rows={3} fullWidth />
+            <FormControl fullWidth>
+              <InputLabel>الفرع</InputLabel>
+              <Select name="branch_id" value={newDoctor.branch_id || ''} onChange={handleSelectChange}>
+                {branchOptions.map(b => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>القسم</InputLabel>
+              <Select name="department_id" value={newDoctor.department_id || ''} onChange={handleSelectChange}>
+                {departmentOptions.map(d => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField label="الأولوية" name="priority" type="number" value={newDoctor.priority} onChange={handleInputChange} fullWidth />
+            <FormControlLabel control={<Switch checked={newDoctor.is_active!} onChange={handleSwitchChange} />} label="نشط" />
             <Box>
-              <Typography variant="subtitle1" gutterBottom>
-                الفروع
-              </Typography>
-              <TextField
-                select
-                SelectProps={{
-                  multiple: true,
-                  value: newDoctor.branches_ids || [],
-                  onChange: (e) => {
-                    const value = e.target.value as number[];
-                    setNewDoctor(prev => ({ ...prev, branches_ids: value }));
-                  },
-                  renderValue: (selected) => {
-                    const selectedBranches = selected as number[];
-                    return selectedBranches.map(id => getBranchName(id)).join(', ');
-                  },
-                }}
-                fullWidth
-              >
-                {branchOptions.map((branch) => (
-                  <MenuItem key={branch.id} value={branch.id}>
-                    <Checkbox checked={newDoctor.branches_ids?.includes(branch.id) || false} />
-                    {branch.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Box>
-
-            <Box>
-              <Typography variant="subtitle1" gutterBottom>
-                القسم
-              </Typography>
-              <TextField
-                select
-                value={newDoctor.department_id || ''}
-                onChange={(e) => setNewDoctor(prev => ({
-                  ...prev,
-                  department_id: parseInt(e.target.value as string)
-                }))}
-                fullWidth
-              >
-                {departmentOptions.map((dept) => (
-                  <MenuItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Box>
-
-            <Box>
-              <Typography variant="subtitle1" gutterBottom>
-                صورة الملف الشخصي
-              </Typography>
-              <Button
-                variant="outlined"
-                component="label"
-                fullWidth
-              >
-                تحميل صورة
-                <input
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  onChange={handleFileChange}
-                />
+              <Typography variant="subtitle1">صورة الحساب</Typography>
+              <Button variant="outlined" component="label" fullWidth>
+                رفع صورة<input type="file" hidden accept="image/*" onChange={handleFileChange} />
               </Button>
-              {imagePreview && (
-                <Box mt={2} textAlign="center">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    style={{
-                      maxHeight: '200px',
-                      maxWidth: '100%',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </Box>
-              )}
+              {imagePreview && <Box mt={2} textAlign="center"><img src={imagePreview} alt="Preview" style={{ maxHeight: 200, maxWidth: '100%', borderRadius: 4 }} /></Box>}
             </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => {
-              setOpenAddDialog(false);
-              resetForm();
-            }}
-            color="secondary"
-          >
-            إلغاء
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            color="primary"
-            disabled={submitting || !newDoctor.name}
-            startIcon={submitting ? <CircularProgress size={20} /> : <Save />}
-          >
-            {submitting ? 'جاري الحفظ...' : 'حفظ'}
+          <Button onClick={() => { setOpenAddDialog(false); resetForm(); }}>إلغاء</Button>
+          <Button onClick={handleSubmit} variant="contained" color="primary" disabled={submitting}>
+            {submitting ? <CircularProgress size={20}/> : 'حفظ'}
           </Button>
         </DialogActions>
       </Dialog>

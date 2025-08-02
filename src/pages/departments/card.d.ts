@@ -8,6 +8,7 @@ interface DepartmentStat {
     name: string;
     description: string;
     image?: string;
+    priority: number;
     branch_ids?: number[] | string;
 }
 interface Props {

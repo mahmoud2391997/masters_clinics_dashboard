@@ -12,7 +12,6 @@ import DataTableHeaders from "./pages/doctors/table";
 import ServicesManager from "./pages/services";
 import DoctorSingle from "./pages/doctors/doctorSingle";
 import OffersPage from "./pages/offers";
-import CategorySinglePage from "./pages/services/singleService";
 import MedicalDevicesPage from "./pages/devices";
 import LandingPageEditor from "./pages/makingLandingPage/landingPageSingle";
 import BlogsDashboard from "./pages/blogs";
@@ -103,7 +102,6 @@ console.log(role);
               <Route path="/regions&branches" element={<RegionsBranchesPage />} />
               <Route path="/services" element={<ServicesManager />} />
               <Route path="/offers" element={<OffersPage />} />
-              <Route path="/services/:id" element={<CategorySinglePage />} />
               <Route path="/devices" element={<MedicalDevicesPage />} />
             </>
           )}

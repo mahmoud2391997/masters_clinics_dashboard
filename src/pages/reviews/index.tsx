@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FiEdit2, FiTrash2, FiPlus, FiSearch, FiUpload } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiPlus, FiSearch, FiUpload, FiStar } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 
 interface Testimonial {
@@ -8,6 +8,7 @@ interface Testimonial {
   des: string;
   title: string;
   sub: string;
+  rating: number; // Added rating field
 }
 
 export default function TestimonialsDashboard() {
@@ -22,7 +23,8 @@ export default function TestimonialsDashboard() {
     img: '', 
     des: '', 
     title: '', 
-    sub: '' 
+    sub: '',
+    rating: 5 // Default to 5 stars
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,6 @@ export default function TestimonialsDashboard() {
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
-
 
   // Filter testimonials based on search
   useEffect(() => {
@@ -145,108 +146,148 @@ export default function TestimonialsDashboard() {
     setImageFile(null);
     setIsEditModalOpen(true);
   };
-const handleUpdate = async () => {
-  if (!editingTestimonial) return;
 
-  try {
-    const formData = new FormData();
-    formData.append('title', editingTestimonial.title);
-    formData.append('sub', editingTestimonial.sub);
-    formData.append('des', editingTestimonial.des);
+  const handleUpdate = async () => {
+    if (!editingTestimonial) return;
 
-    if (imageFile) {
+    try {
+      const formData = new FormData();
+      formData.append('title', editingTestimonial.title);
+      formData.append('sub', editingTestimonial.sub);
+      formData.append('des', editingTestimonial.des);
+      formData.append('rating', editingTestimonial.rating.toString());
+
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+
+      const response = await fetch(`https://www.ss.mastersclinics.com/testimonials/${editingTestimonial.id}`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('فشل تحديث الرأي');
+      }
+
+      const updatedTestimonial = await response.json();
+
+      // Refresh local list
+      setTestimonials(testimonials.map(t =>
+        t.id === editingTestimonial.id ? updatedTestimonial : t
+      ));
+      setIsEditModalOpen(false);
+      setImageFile(null);
+      setImagePreview(null);
+      Swal.fire('تم التحديث!', 'تم تحديث الرأي بنجاح.', 'success');
+    } catch (err) {
+      Swal.fire({
+        title: 'خطأ!',
+        text: 'فشل تحديث الرأي',
+        icon: 'error',
+        confirmButtonText: 'حسناً'
+      });
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!newTestimonial.title || !newTestimonial.sub || !newTestimonial.des) {
+      Swal.fire({
+        title: 'تنبيه!',
+        text: 'يرجى تعبئة جميع الحقول',
+        icon: 'warning',
+        confirmButtonText: 'حسناً'
+      });
+      return;
+    }
+
+    if (!imageFile) {
+      Swal.fire({
+        title: 'تنبيه!',
+        text: 'يرجى اختيار صورة',
+        icon: 'warning',
+        confirmButtonText: 'حسناً'
+      });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
       formData.append('image', imageFile);
+      formData.append('title', newTestimonial.title);
+      formData.append('sub', newTestimonial.sub);
+      formData.append('des', newTestimonial.des);
+      formData.append('rating', newTestimonial.rating.toString());
+
+      const response = await fetch('https://www.ss.mastersclinics.com/testimonials', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('فشل إضافة رأي جديد');
+      }
+
+      const addedTestimonial = await response.json();
+      setTestimonials([addedTestimonial, ...testimonials]);
+      setIsAddModalOpen(false);
+      setNewTestimonial({ img: '', des: '', title: '', sub: '', rating: 5 });
+      setImageFile(null);
+      setImagePreview(null);
+      Swal.fire(
+        'تمت الإضافة!',
+        'تم إضافة الرأي الجديد بنجاح.',
+        'success'
+      );
+    } catch (err) {
+      Swal.fire({
+        title: 'خطأ!',
+        text: 'فشل إضافة رأي جديد',
+        icon: 'error',
+        confirmButtonText: 'حسناً'
+      });
     }
+  };
 
-    const response = await fetch(`https://www.ss.mastersclinics.com/testimonials/${editingTestimonial.id}`, {
-      method: 'PUT',
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error('فشل تحديث الرأي');
-    }
-
-    const updatedTestimonial = await response.json();
-
-    // Refresh local list
-    setTestimonials(testimonials.map(t =>
-      t.id === editingTestimonial.id ? updatedTestimonial : t
-    ));
-    setIsEditModalOpen(false);
-    setImageFile(null);
-    setImagePreview(null);
-    Swal.fire('تم التحديث!', 'تم تحديث الرأي بنجاح.', 'success');
-  } catch (err) {
-    Swal.fire({
-      title: 'خطأ!',
-      text: 'فشل تحديث الرأي',
-      icon: 'error',
-      confirmButtonText: 'حسناً'
-    });
-  }
-};
-
-
-
-
-const handleAdd = async () => {
-  if (!newTestimonial.title || !newTestimonial.sub || !newTestimonial.des) {
-    Swal.fire({
-      title: 'تنبيه!',
-      text: 'يرجى تعبئة جميع الحقول',
-      icon: 'warning',
-      confirmButtonText: 'حسناً'
-    });
-    return;
-  }
-
-  if (!imageFile) {
-    Swal.fire({
-      title: 'تنبيه!',
-      text: 'يرجى اختيار صورة',
-      icon: 'warning',
-      confirmButtonText: 'حسناً'
-    });
-    return;
-  }
-
-  try {
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    formData.append('title', newTestimonial.title);
-    formData.append('sub', newTestimonial.sub);
-    formData.append('des', newTestimonial.des);
-
-    const response = await fetch('https://www.ss.mastersclinics.com/testimonials', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error('فشل إضافة رأي جديد');
-    }
-
-    const addedTestimonial = await response.json();
-    setTestimonials([addedTestimonial, ...testimonials]);
-    setIsAddModalOpen(false);
-    setNewTestimonial({ img: '', des: '', title: '', sub: '' });
-    setImageFile(null);
-    setImagePreview(null);
-    Swal.fire(
-      'تمت الإضافة!',
-      'تم إضافة الرأي الجديد بنجاح.',
-      'success'
+  // Render star rating
+  const renderStars = (rating: number) => {
+    return (
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <FiStar 
+            key={star}
+            className={`h-5 w-5 ${star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+          />
+        ))}
+      </div>
     );
-  } catch (err) {
-    Swal.fire({
-      title: 'خطأ!',
-      text: 'فشل إضافة رأي جديد',
-      icon: 'error',
-      confirmButtonText: 'حسناً'
-    });
-  }
-};
+  };
+
+  // Star rating input component
+  const StarRatingInput = ({ 
+    value, 
+    onChange 
+  }: { 
+    value: number; 
+    onChange: (rating: number) => void 
+  }) => {
+    return (
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onChange(star)}
+            className="focus:outline-none"
+          >
+            <FiStar 
+              className={`h-6 w-6 ${star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+            />
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -380,6 +421,9 @@ const handleAdd = async () => {
                     الوظيفة
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    التقييم
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     الرأي
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -402,6 +446,9 @@ const handleAdd = async () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">{testimonial.sub}</div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {renderStars(testimonial.rating)}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-500 line-clamp-2">{testimonial.des}</div>
                       </td>
@@ -423,7 +470,7 @@ const handleAdd = async () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
                       لا توجد آراء متاحة
                     </td>
                   </tr>
@@ -540,6 +587,13 @@ const handleAdd = async () => {
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">التقييم</label>
+                    <StarRatingInput 
+                      value={editingTestimonial.rating} 
+                      onChange={(rating) => setEditingTestimonial({...editingTestimonial, rating})} 
+                    />
+                  </div>
+                  <div>
                     <label htmlFor="edit-des" className="block text-sm font-medium text-gray-700">الرأي</label>
                     <textarea
                       id="edit-des"
@@ -637,6 +691,13 @@ const handleAdd = async () => {
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       value={newTestimonial.sub}
                       onChange={(e) => setNewTestimonial({...newTestimonial, sub: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">التقييم</label>
+                    <StarRatingInput 
+                      value={newTestimonial.rating} 
+                      onChange={(rating) => setNewTestimonial({...newTestimonial, rating})} 
                     />
                   </div>
                   <div>

@@ -92,12 +92,13 @@ const BlogSinglePage: React.FC = () => {
     try {
       setLoading(true);
       const formData = new FormData();
-      formData.append('title2', editedBlog.title2 || '');
-      formData.append('author', editedBlog.author || '');
-      formData.append('content', editedBlog.content || '');
-      formData.append('slug', editedBlog.slug || '');
-      formData.append('blogSingleImg', editedBlog.blogSingleImg || '');
-      formData.append('comment', String(editedBlog.comment ?? 0));
+      
+      // Append all fields from editedBlog
+      Object.entries(editedBlog).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formData.append(key, value.toString());
+        }
+      });
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -108,10 +109,10 @@ const BlogSinglePage: React.FC = () => {
       });
 
       // Refresh data
-      const updated = await axios.get<Blog>(`https://www.ss.mastersclinics.com/blogs/${id}`);
-      setBlog(updated.data);
-      setEditedBlog(updated.data);
-      setImagePreview(getImageUrl(updated.data.image));
+      const response = await axios.get<Blog>(`https://www.ss.mastersclinics.com/blogs/${id}`);
+      setBlog(response.data);
+      setEditedBlog(response.data);
+      setImagePreview(getImageUrl(response.data.image));
       setIsEditing(false);
       setImageFile(null);
     } catch (err) {
@@ -171,6 +172,16 @@ const BlogSinglePage: React.FC = () => {
           </div>
 
           <div className="form-group">
+            <label>المحتوى:</label>
+            <textarea
+              name="content"
+              value={editedBlog.content || ''}
+              onChange={handleInputChange}
+              rows={6}
+            />
+          </div>
+
+          <div className="form-group">
             <label>الصورة:</label>
             <div className="image-upload-container">
               <img
@@ -198,16 +209,6 @@ const BlogSinglePage: React.FC = () => {
                 />
               </div>
             </div>
-          </div>
-
-          <div className="form-group">
-            <label>المحتوى:</label>
-            <textarea
-              name="content"
-              value={editedBlog.content || ''}
-              onChange={handleInputChange}
-              rows={6}
-            />
           </div>
 
           <div className="button-group">

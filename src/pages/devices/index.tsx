@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Space,
@@ -14,30 +13,25 @@ import {
   message,
   Image,
   ConfigProvider,
-  TimePicker,
-  Checkbox,
-  Card,
   Row,
   Col
-} from "antd"
-import { UploadOutlined, DeleteOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons"
-import { getBranches } from "../../api/regions&branches"
-import { fetchDepartments } from "../../api/departments"
-import arabic from "antd/lib/locale/ar_EG"
-import { addDevice, deleteDevice, getDevices, updateDevice } from "../../api/devices"
-import dayjs from "dayjs"
+} from "antd";
+import { UploadOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { getBranches } from "../../api/regions&branches";
+import arabic from "antd/lib/locale/ar_EG";
+import { addDevice, deleteDevice, getDevices, updateDevice } from "../../api/devices";
+import type { AxiosResponse } from "axios";
+import { getImageUrl } from "../../hooks/imageUrl";
 
-const { Option } = Select
-const { TextArea } = Input
+const { Option } = Select;
+const { TextArea } = Input;
 
 const arabicText = {
   deviceImage: "صورة الجهاز",
   deviceName: "اسم الجهاز",
-  description: "الوصف",
-  departments: "الأقسام",
-  branches: "الفروع",
-  workingTimeSlots: "مواعيد العمل",
-  sessionPeriod: "مدة الجلسة (دقيقة)",
+  deviceType: "نوع الجهاز",
+  branch: "الفرع",
+  availableTimes: "مواعيد العمل",
   actions: "الإجراءات",
   addDevice: "إضافة جهاز",
   editDevice: "تعديل جهاز",
@@ -46,10 +40,8 @@ const arabicText = {
   confirmDelete: "تأكيد الحذف",
   deleteConfirmMessage: "هل أنت متأكد من رغبتك في حذف هذا الجهاز؟",
   deviceNameRequired: "يرجى إدخال اسم الجهاز!",
-  descriptionRequired: "يرجى إدخال وصف الجهاز!",
-  departmentsRequired: "يرجى اختيار الأقسام!",
-  branchesRequired: "يرجى اختيار الفروع!",
-  sessionPeriodRequired: "يرجى إدخال مدة الجلسة!",
+  deviceTypeRequired: "يرجى اختيار نوع الجهاز!",
+  branchRequired: "يرجى اختيار الفرع!",
   operationFailed: "فشلت العملية",
   deviceAdded: "تم إضافة الجهاز بنجاح",
   deviceUpdated: "تم تحديث الجهاز بنجاح",
@@ -59,236 +51,210 @@ const arabicText = {
   medicalDevices: "الأجهزة الطبية",
   cancel: "إلغاء",
   ok: "موافق",
-  day: "اليوم",
-  startTime: "وقت البدء",
-  endTime: "وقت الانتهاء",
-  active: "نشط",
-  addTimeSlot: "إضافة موعد عمل",
-  workingHours: "ساعات العمل",
-  saturday: "السبت",
-  sunday: "الأحد",
-  monday: "الإثنين",
-  tuesday: "الثلاثاء",
-  wednesday: "الأربعاء",
-  thursday: "الخميس",
-  friday: "الجمعة"
+};
+
+const deviceTypes = [
+  "ليزر ازالة الشعر",
+  "ليزر ازالة الشعر (تشقير)",
+  "اجهزة تنظيف البشرة",
+  "اجهزة التغذية ونحت القوام",
+  "اجهزة معالجة البشرة",
+  "اجهزة التجميل النسائي"
+];
+interface Device {
+  id: number;
+  _id: string;
+  name: string;
+  type: string;
+  branch_id: number;
+  available_times?: string;
+  doctor_id?: number | null;
+  image_url?: string | null;
+  is_active?: boolean;
+  priority?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-interface WorkingTimeSlot {
-  day: string;
-  startTime: string;
-  endTime: string;
-  isActive: boolean;
-}
 
 interface Branch {
-  id: string
-  name: string
-  address: string
-  location_link: string
-  region: string
-  image?: string
-  coordinates: { latitude: number; longitude: number }
-}
-
-interface Department {
-  id: string
-  name: string
-  description?: string
-  imageUrl?: string
-}
-
-interface Device {
-  id: string
-  name: string
-  description?: string
-  department_id: number[]
-  branches: number[]
-  working_time_slots: WorkingTimeSlot[]
-  sessionPeriod: string
-  imageUrl?: string
-  image?: string
+  id: number;
+  name: string;
+  address: string;
+  location_link: string;
+  region_id: number;
+  image_url?: string | null;
+  latitude: number;
+  longitude: number;
 }
 
 const MedicalDevicesPage: React.FC = () => {
-  const [devices, setDevices] = useState<Device[]>([])
-  const [isModalVisible, setIsModalVisible] = useState(false)
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false)
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null)
-  const [deviceToDelete, setDeviceToDelete] = useState<string | null>(null)
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [fileList, setFileList] = useState<any[]>([])
-  const [imagePreview, setImagePreview] = useState<string>("")
-  const [loading, setLoading] = useState(false)
-  const [form] = Form.useForm()
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [deviceToDelete, setDeviceToDelete] = useState<string | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true)
-        const [devicesData, branchesData, departmentsData] = await Promise.all([
+        setLoading(true);
+        const [devicesResponse, branchesResponse] = await Promise.all([
           getDevices(),
           getBranches(),
-          fetchDepartments(),
-        ])
-        console.log(devicesData);
+        ]);
+        console.log(branchesResponse);
         
-        setDevices(devicesData.map(device => ({
+        // Transform devices data to match our interface
+        const devicesData = (devicesResponse as unknown as Device[]).map(device => ({
           ...device,
-          working_time_slots: device.working_time_slots.map(slot => ({
-            ...slot,
-            startTime: slot.startTime || '',
-            endTime: slot.endTime || '',
-            isActive: true
-          }))
-        })))
-        setBranches(branchesData.data)
+          _id: device._id || device.id.toString(),
+          branch_id: Number(device.branch_id),
+        }));
 
-        setDepartments(departmentsData.map(dept => ({
-          ...dept,
-          id: dept.id.toString()
-        })))
-        setLoading(false)
+        // Transform branches data
+        const branchesData = (branchesResponse.data as unknown as Branch[]).map(branch => ({
+          ...branch,
+          id: Number(branch.id),
+        }));
+
+        setDevices(devicesData);
+        setBranches(branchesData);
       } catch (error) {
-        message.error(arabicText.operationFailed)
-        setLoading(false)
+        console.error("Failed to fetch data:", error);
+        message.error(arabicText.operationFailed);
+      } finally {
+        setLoading(false);
       }
-    }
-    fetchData()
-  }, [])
+    };
+    fetchData();
+  }, []);
 
   const handleBeforeUpload = (file: File) => {
-    const isImage = file.type.startsWith("image/")
+    const isImage = file.type.startsWith("image/");
     if (!isImage) {
-      message.error(arabicText.imageRequirements)
-      return Upload.LIST_IGNORE
+      message.error(arabicText.imageRequirements);
+      return Upload.LIST_IGNORE;
     }
-    const isLt5M = file.size / 1024 / 1024 < 5
+    const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      message.error(arabicText.imageRequirements)
-      return Upload.LIST_IGNORE
+      message.error(arabicText.imageRequirements);
+      return Upload.LIST_IGNORE;
     }
-    return true
-  }
+    return true;
+  };
 
   const handleImageChange = ({ fileList }: any) => {
-    const newFileList = fileList.slice(-1)
-    setFileList(newFileList)
+    const newFileList = fileList.slice(-1);
+    setFileList(newFileList);
 
     if (newFileList.length > 0 && newFileList[0].originFileObj) {
-      const reader = new FileReader()
-      reader.onload = (e) => setImagePreview(e.target?.result as string)
-      reader.readAsDataURL(newFileList[0].originFileObj)
-      form.setFieldsValue({ imageFile: newFileList[0].originFileObj })
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target?.result as string);
+      reader.readAsDataURL(newFileList[0].originFileObj);
+      form.setFieldsValue({ imageFile: newFileList[0].originFileObj });
     } else {
-      setImagePreview("")
-      form.setFieldsValue({ imageFile: null })
+      setImagePreview("");
+      form.setFieldsValue({ imageFile: null });
     }
-  }
+  };
 
   const handleAdd = () => {
-    setEditingDevice(null)
-    form.resetFields()
-    setFileList([])
-    setImagePreview("")
-    setIsModalVisible(true)
-  }
+    setEditingDevice(null);
+    form.resetFields();
+    setFileList([]);
+    setImagePreview("");
+    setIsModalVisible(true);
+  };
 
   const handleEdit = (device: Device) => {
-    setEditingDevice(device)
-    form.setFieldsValue({
-      ...device,
-      department_id: device.department_id,
-      branches: device.branches,
-      sessionPeriod: device.sessionPeriod,
-      working_time_slots: device.working_time_slots?.map(slot => ({
-        ...slot,
-        startTime: slot.startTime ? dayjs(slot.startTime, 'HH:mm') : null,
-        endTime: slot.endTime ? dayjs(slot.endTime, 'HH:mm') : null
-      })) || []
-    })
-    setImagePreview(device.image || "")
-    setIsModalVisible(true)
-  }
+    setEditingDevice(device);
+  form.setFieldsValue({
+  name: device.name,
+  type: device.type,
+  branch_id: device.branch_id,
+  available_times: device.available_times,
+  priority: device.priority ?? 0,
+  is_active: device.is_active ?? true,
+});
+
+    setImagePreview(device.image_url || "");
+    setIsModalVisible(true);
+  };
 
   const handleDelete = (id: string) => {
-    setDeviceToDelete(id)
-    setDeleteModalVisible(true)
-  }
+    setDeviceToDelete(id);
+    setDeleteModalVisible(true);
+  };
 
   const confirmDelete = async () => {
-    if (!deviceToDelete) return
+    if (!deviceToDelete) return;
     try {
-      setLoading(true)
-      await deleteDevice(deviceToDelete)
-      setDevices(devices.filter((device) => device.id !== deviceToDelete))
-      message.success(arabicText.deviceDeleted)
+      setLoading(true);
+      await deleteDevice(deviceToDelete);
+      setDevices(devices.filter((device) => device._id !== deviceToDelete));
+      message.success(arabicText.deviceDeleted);
     } catch (error) {
-      message.error(arabicText.operationFailed)
+      console.error("Failed to delete device:", error);
+      message.error(arabicText.operationFailed);
     } finally {
-      setLoading(false)
-      setDeleteModalVisible(false)
+      setLoading(false);
+      setDeleteModalVisible(false);
     }
-  }
+  };
 
-const handleOk = async () => {
-  try {
-    setLoading(true);
-    const values = await form.validateFields();
+  const handleOk = async () => {
+    try {
+      setLoading(true);
+      const values = await form.validateFields();
 
-    const formData = new FormData();
-    formData.append("name", values.name);
-    formData.append("description", values.description || "");
-    formData.append("sessionPeriod", values.sessionPeriod);
-    formData.append("department_id", JSON.stringify(values.department_id));
-    formData.append("branches", JSON.stringify(values.branches));
+      const formData = new FormData();
+      formData.append("name", values.name);
+      formData.append("type", values.type);
+      formData.append("priority", values.priority?.toString() || "0");
+formData.append("is_active", values.is_active ? "true" : "false");
 
-    if (values.working_time_slots) {
-      const processedSlots = values.working_time_slots.map((slot: { day: string; startTime: any; endTime: any; isActive?: boolean }) => ({
-        day: slot.day,
-        startTime: slot.startTime ? slot.startTime.format('HH:mm') : '',
-        endTime: slot.endTime ? slot.endTime.format('HH:mm') : '',
-        isActive: slot.isActive !== false,
-      }));
-      formData.append("working_time_slots", JSON.stringify(processedSlots));
+      formData.append("branch_id", values.branch_id.toString());
+      formData.append("available_times", values.available_times || "");
+
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        formData.append("image", fileList[0].originFileObj);
+      } else if (editingDevice?.image_url) {
+        formData.append("keepExistingImage", "true");
+      }
+
+      let response: AxiosResponse<Device>;
+      if (editingDevice) {
+        response = await updateDevice(editingDevice._id, formData);
+        setDevices(devices.map(d => d._id === editingDevice._id ? response.data : d));
+        message.success(arabicText.deviceUpdated);
+      } else {
+        response = await addDevice(formData);
+        setDevices([...devices, response.data]);
+        message.success(arabicText.deviceAdded);
+      }
+
+      setIsModalVisible(false);
+    } catch (error) {
+      console.error("Operation failed:", error);
+      message.error(arabicText.operationFailed);
+    } finally {
+      setLoading(false);
     }
-
-    // ✅ Fix: Always use fileList, not form value
-    if (fileList.length > 0 && fileList[0].originFileObj) {
-      formData.append("image", fileList[0].originFileObj);
-    } else if (editingDevice?.image) {
-      formData.append("keepExistingImage", "true");
-    }
-
-    let device: Device;
-    if (editingDevice) {
-      device = await updateDevice(editingDevice.id, formData);
-      setDevices(devices.map((d) => (d.id === editingDevice.id ? device : d)));
-      message.success(arabicText.deviceUpdated);
-    } else {
-      device = await addDevice(formData);
-      setDevices([...devices, device]);
-      message.success(arabicText.deviceAdded);
-    }
-
-    setIsModalVisible(false);
-  } catch (error) {
-    console.error("Error:", error);
-    message.error(arabicText.operationFailed);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const columns = [
     {
       title: arabicText.deviceImage,
-      dataIndex: "image",
+      dataIndex: "image_url",
       key: "image",
-      render: (url: string) =>
-        url ? <Image src={url} alt="device" width={50} height={50} style={{ objectFit: "cover" }} /> : "-",
+      render: (url: string | null) =>
+        url ? <Image src={ getImageUrl(url) } alt="device" width={50} height={50} style={{ objectFit: "cover" }} /> : "-",
     },
     {
       title: arabicText.deviceName,
@@ -296,78 +262,61 @@ const handleOk = async () => {
       key: "name",
     },
     {
-      title: arabicText.description,
-      dataIndex: "description",
-      key: "description",
-      render: (text: string) => text || "-",
+      title: arabicText.deviceType,
+      dataIndex: "type",
+      key: "type",
     },
     {
-      title: arabicText.departments,
-      dataIndex: "department_id",
-      key: "departments",
-      render: (departmentIds: number[]) =>
-        departmentIds && departmentIds.length ? (
-          <span>{departmentIds.map((id) => departments.find((d) => d.id.toString() === id.toString())?.name || id).join(", ")}</span>
-        ) : (
-          "-"
-        ),
+  title: "الأولوية",
+  dataIndex: "priority",
+  key: "priority",
+  render: (val: number) => val ?? "-",
+},
+{
+  title: "نشط؟",
+  dataIndex: "is_active",
+  key: "is_active",
+  render: (val: boolean) => (val ? "نعم" : "لا"),
+},
+
+    {
+      title: arabicText.branch,
+      dataIndex: "branch_id",
+      key: "branch",
+      render: (branchId: number) => {
+        const branch = branches.find(b => b.id === branchId);
+        return branch ? branch.name : branchId.toString();
+      }
     },
     {
-      title: arabicText.branches,
-      dataIndex: "branches",
-      key: "branches",
-      render: (branchIds: number[]) =>
-        branchIds && branchIds.length ? (
-          <span>
-            {branchIds
-              .map((id) => {
-                const branch = branches.find((b) => b.id.toString() === id.toString())
-                return branch ? branch.name : id
-              })
-              .join(", ")}
-          </span>
-        ) : (
-          "-"
-        ),
-    },
-    {
-      title: arabicText.sessionPeriod,
-      dataIndex: "sessionPeriod",
-      key: "sessionPeriod",
-      render: (period: string) => `${period} ${arabicText.sessionPeriod}`,
-    },
-    {
-      title: arabicText.workingHours,
-      dataIndex: "working_time_slots",
-      key: "working_time_slots",
-      render: (slots: WorkingTimeSlot[]) => (
-        <div>
-          {slots?.map((slot, index) => (
-            <div key={index}>
-              {arabicText[slot.day as keyof typeof arabicText] || slot.day}: {slot.startTime} - {slot.endTime} {slot.isActive ? `(${arabicText.active})` : ""}
-            </div>
-          ))}
-        </div>
-      ),
+      title: arabicText.availableTimes,
+      dataIndex: "available_times",
+      key: "available_times",
+      render: (times: string | undefined) => times || "-",
     },
     {
       title: arabicText.actions,
       key: "actions",
       render: (_: any, record: Device) => (
         <Space size="middle">
-          <Button onClick={() => handleEdit(record)}>{arabicText.edit}</Button>
+          <Button 
+            icon={<EditOutlined />} 
+            onClick={() => handleEdit(record)}
+          >
+            {arabicText.edit}
+          </Button>
           <Button
             danger
-            onClick={() => handleDelete(record.id)}
+            onClick={() => handleDelete(record._id)}
             icon={<DeleteOutlined />}
-            loading={loading && deviceToDelete === record.id}
+            loading={loading && deviceToDelete === record._id}
           >
             {arabicText.delete}
           </Button>
         </Space>
       ),
     },
-  ]
+  ];
 
   return (
     <ConfigProvider direction="rtl" locale={arabic}>
@@ -388,7 +337,6 @@ const handleOk = async () => {
           pagination={{ pageSize: 10 }}
         />
 
-        {/* Add/Edit Modal */}
         <Modal
           title={editingDevice ? arabicText.editDevice : arabicText.addDevice}
           open={isModalVisible}
@@ -399,11 +347,7 @@ const handleOk = async () => {
           confirmLoading={loading}
           width={800}
         >
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={{}}
-          >
+          <Form form={form} layout="vertical">
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
@@ -416,111 +360,57 @@ const handleOk = async () => {
               </Col>
               <Col span={12}>
                 <Form.Item
-                  label={arabicText.sessionPeriod}
-                  name="sessionPeriod"
-                  rules={[{ required: true, message: arabicText.sessionPeriodRequired }]}
+                  label={arabicText.deviceType}
+                  name="type"
+                  rules={[{ required: true, message: arabicText.deviceTypeRequired }]}
                 >
-                  <Input type="number" addonAfter="دقيقة" />
+                  <Select placeholder={arabicText.deviceType}>
+                    {deviceTypes.map(type => (
+                      <Option key={type} value={type}>{type}</Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
-
-            <Form.Item
-              label={arabicText.description}
-              name="description"
-              rules={[{ required: true, message: arabicText.descriptionRequired }]}
-            >
-              <TextArea rows={3} />
-            </Form.Item>
+<Row gutter={16}>
+  <Col span={12}>
+    <Form.Item label="الأولوية" name="priority">
+      <Input type="number" placeholder="مثال: 1 (أعلى أولوية)" />
+    </Form.Item>
+  </Col>
+  <Col span={12}>
+    <Form.Item label="نشط؟" name="is_active" valuePropName="checked">
+      <Select>
+        <Option value={true}>نعم</Option>
+        <Option value={false}>لا</Option>
+      </Select>
+    </Form.Item>
+  </Col>
+</Row>
 
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  label={arabicText.departments}
-                  name="department_id"
-                  rules={[{ required: true, message: arabicText.departmentsRequired }]}
+                  label={arabicText.branch}
+                  name="branch_id"
+                  rules={[{ required: true, message: arabicText.branchRequired }]}
                 >
-                  <Select mode="multiple" placeholder={arabicText.departments}>
-                    {departments.map((dep) => (
-                      <Option key={dep.id} value={dep.id}>
-                        {dep.name}
-                      </Option>
+                  <Select placeholder={arabicText.branch}>
+                    {branches.map(branch => (
+                      <Option key={branch.id} value={branch.id}>{branch.name}</Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item
-                  label={arabicText.branches}
-                  name="branches"
-                  rules={[{ required: true, message: arabicText.branchesRequired }]}
+                  label={arabicText.availableTimes}
+                  name="available_times"
                 >
-                  <Select mode="multiple" placeholder={arabicText.branches}>
-                    {branches.map((branch) => (
-                      <Option key={branch.id} value={parseInt(branch.id)}>
-                        {branch.name}
-                      </Option>
-                    ))}
-                  </Select>
+                  <TextArea rows={2} placeholder="مثال: السبت (1 ظ - 10م), الأحد (9:30 ص-10م)" />
                 </Form.Item>
               </Col>
             </Row>
-
-            <Card title={arabicText.workingTimeSlots} style={{ marginBottom: 16 }}>
-              <Form.List name="working_time_slots">
-                {(fields, { add, remove }) => (
-                  <>
-                    {fields.map(({ key, name, ...restField }) => (
-                      <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'day']}
-                          rules={[{ required: true, message: 'اختر اليوم' }]}
-                        >
-                          <Select placeholder={arabicText.day} style={{ width: 120 }}>
-                            <Option value="saturday">{arabicText.saturday}</Option>
-                            <Option value="sunday">{arabicText.sunday}</Option>
-                            <Option value="monday">{arabicText.monday}</Option>
-                            <Option value="tuesday">{arabicText.tuesday}</Option>
-                            <Option value="wednesday">{arabicText.wednesday}</Option>
-                            <Option value="thursday">{arabicText.thursday}</Option>
-                            <Option value="friday">{arabicText.friday}</Option>
-                          </Select>
-                        </Form.Item>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'startTime']}
-                          rules={[{ required: true, message: arabicText.startTime }]}
-                        >
-                          <TimePicker format="HH:mm" placeholder={arabicText.startTime} />
-                        </Form.Item>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'endTime']}
-                          rules={[{ required: true, message: arabicText.endTime }]}
-                        >
-                          <TimePicker format="HH:mm" placeholder={arabicText.endTime} />
-                        </Form.Item>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'isActive']}
-                          valuePropName="checked"
-                          initialValue={true}
-                        >
-                          <Checkbox>{arabicText.active}</Checkbox>
-                        </Form.Item>
-                        <MinusCircleOutlined onClick={() => remove(name)} />
-                      </Space>
-                    ))}
-                    <Form.Item>
-                      <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                        {arabicText.addTimeSlot}
-                      </Button>
-                    </Form.Item>
-                  </>
-                )}
-              </Form.List>
-            </Card>
 
             <Form.Item label={arabicText.uploadImage}>
               <Upload
@@ -543,7 +433,6 @@ const handleOk = async () => {
           </Form>
         </Modal>
 
-        {/* Delete confirmation modal */}
         <Modal
           title={arabicText.confirmDelete}
           open={deleteModalVisible}
@@ -557,7 +446,7 @@ const handleOk = async () => {
         </Modal>
       </div>
     </ConfigProvider>
-  )
-}
+  );
+};
 
-export default MedicalDevicesPage
+export default MedicalDevicesPage;

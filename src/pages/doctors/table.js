@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { Table, TableContainer, TableHead, TableRow, TableCell, Paper, Box, TextField, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Stack, TableBody, Checkbox, MenuItem, LinearProgress, CircularProgress, IconButton } from '@mui/material';
-import { Add, Save, Delete } from '@mui/icons-material';
+import { Table, TableContainer, TableHead, TableRow, TableCell, Paper, Box, TextField, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Stack, LinearProgress, CircularProgress, IconButton, MenuItem, FormControl, InputLabel, Select, Switch, FormControlLabel, TableBody } from '@mui/material';
+import { Add, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 const DoctorTable = () => {
@@ -13,23 +13,8 @@ const DoctorTable = () => {
     const [doctorToDelete, setDoctorToDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
     const [newDoctor, setNewDoctor] = useState({
-        name: '',
-        title: '',
-        description: '',
-        position: '',
-        practice_area: '',
-        experience: '',
-        address: '',
-        phone: '',
-        email: '',
-        personal_experience: '',
-        education: [],
-        skills: [],
-        achievements: [],
-        working_hours: [],
-        branches_ids: [],
-        department_id: 0,
-        image: null,
+        name: '', specialty: '', branch_id: 0, department_id: 0,
+        services: '', image: null, priority: 0, is_active: true
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -39,68 +24,61 @@ const DoctorTable = () => {
     const [branchOptions, setBranchOptions] = useState([]);
     const [departmentOptions, setDepartmentOptions] = useState([]);
     useEffect(() => {
-        const fetchDoctors = async () => {
-            try {
-                const response = await axios.get('https://www.ss.mastersclinics.com/doctors', {
-                    headers: {
-                        Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-                    },
-                });
-                setDoctors(response.data);
-                setFilteredDoctors(response.data);
-            }
-            catch (err) {
-                setError('فشل في تحميل بيانات الأطباء');
-                console.error(err);
-            }
-            finally {
-                setLoading(false);
-            }
-        };
         fetchDoctors();
-    }, []);
-    useEffect(() => {
-        const fetchOptions = async () => {
-            try {
-                const [branchesRes, departmentsRes] = await Promise.all([
-                    axios.get('https://www.ss.mastersclinics.com/branches', {
-                        headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
-                    }),
-                    axios.get('https://www.ss.mastersclinics.com/departments', {
-                        headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
-                    }),
-                ]);
-                setBranchOptions(branchesRes.data);
-                setDepartmentOptions(departmentsRes.data);
-            }
-            catch (err) {
-                console.error('فشل في تحميل الفروع أو الأقسام', err);
-            }
-        };
         fetchOptions();
     }, []);
+    const fetchDoctors = async () => {
+        try {
+            const resp = await axios.get('https://www.ss.mastersclinics.com/doctors', {
+                headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
+            });
+            console.log(resp.data);
+            setDoctors(resp.data);
+            setFilteredDoctors(resp.data);
+        }
+        catch (err) {
+            console.error(err);
+            setError('فشل تحميل الأطباء');
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const fetchOptions = async () => {
+        try {
+            const [b, d] = await Promise.all([
+                axios.get('https://www.ss.mastersclinics.com/branches', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } }),
+                axios.get('https://www.ss.mastersclinics.com/departments', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } }),
+            ]);
+            setBranchOptions(b.data);
+            setDepartmentOptions(d.data);
+        }
+        catch (err) {
+            console.error(err);
+        }
+    };
     useEffect(() => {
-        const filtered = doctors.filter(doctor => doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (doctor.title && doctor.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (doctor.practice_area && doctor.practice_area.toLowerCase().includes(searchQuery.toLowerCase())));
-        setFilteredDoctors(filtered);
+        const f = doctors.filter(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (doc.specialty && doc.specialty.toLowerCase().includes(searchQuery.toLowerCase())));
+        setFilteredDoctors(f);
     }, [searchQuery, doctors]);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setNewDoctor(prev => ({ ...prev, [name]: value }));
+        setNewDoctor(prev => ({ ...prev, [name]: name === 'priority' ? Number(value) : value }));
     };
-    const handleListChange = (name, value) => {
-        setNewDoctor(prev => ({ ...prev, [name]: value.split(',').map(item => item.trim()) }));
+    const handleSwitchChange = (e) => {
+        setNewDoctor(prev => ({ ...prev, is_active: e.target.checked }));
+    };
+    const handleSelectChange = (e) => {
+        const { name, value } = e.target;
+        setNewDoctor(prev => ({ ...prev, [name]: Number(value) }));
     };
     const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setImageFile(file);
+        if (e.target.files?.[0]) {
+            setImageFile(e.target.files[0]);
             const reader = new FileReader();
-            reader.onload = (event) => {
-                setImagePreview(event.target?.result);
-            };
-            reader.readAsDataURL(file);
+            reader.onload = () => setImagePreview(reader.result);
+            reader.readAsDataURL(e.target.files[0]);
         }
     };
     const handleSubmit = async () => {
@@ -111,69 +89,35 @@ const DoctorTable = () => {
         setSubmitting(true);
         try {
             const formData = new FormData();
-            formData.append('name', newDoctor.name);
-            formData.append('title', newDoctor.title || '');
-            formData.append('description', newDoctor.description || '');
-            formData.append('position', newDoctor.position || '');
-            formData.append('practice_area', newDoctor.practice_area || '');
-            formData.append('experience', newDoctor.experience || '');
-            formData.append('address', newDoctor.address || '');
-            formData.append('phone', newDoctor.phone || '');
-            formData.append('email', newDoctor.email || '');
-            formData.append('personal_experience', newDoctor.personal_experience || '');
-            formData.append('education', JSON.stringify(newDoctor.education || []));
-            formData.append('skills', JSON.stringify(newDoctor.skills || []));
-            formData.append('achievements', JSON.stringify(newDoctor.achievements || []));
-            formData.append('working_hours', JSON.stringify(newDoctor.working_hours || []));
-            formData.append('branches_ids', JSON.stringify(newDoctor.branches_ids || []));
-            formData.append('department_id', newDoctor.department_id?.toString() || '');
-            if (imageFile) {
-                formData.append('image', imageFile);
-            }
-            const response = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
-                headers: {
-                    'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-                    'Content-Type': 'multipart/form-data',
-                },
+            Object.entries(newDoctor).forEach(([k, v]) => {
+                if (v !== undefined)
+                    formData.append(k, String(v));
             });
-            setDoctors(prev => [...prev, response.data]);
-            setFilteredDoctors(prev => [...prev, response.data]);
+            if (imageFile)
+                formData.append('image', imageFile);
+            const resp = await axios.post('https://www.ss.mastersclinics.com/doctors', formData, {
+                headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}`, 'Content-Type': 'multipart/form-data' }
+            });
+            setDoctors(prev => [...prev, resp.data]);
+            setFilteredDoctors(prev => [...prev, resp.data]);
             setOpenAddDialog(false);
             resetForm();
         }
         catch (err) {
-            setError('فشل في إضافة الطبيب');
             console.error(err);
+            setError('فشل إضافة الطبيب');
         }
         finally {
             setSubmitting(false);
         }
     };
     const resetForm = () => {
-        setNewDoctor({
-            name: '',
-            title: '',
-            description: '',
-            position: '',
-            practice_area: '',
-            experience: '',
-            address: '',
-            phone: '',
-            email: '',
-            personal_experience: '',
-            education: [],
-            skills: [],
-            achievements: [],
-            working_hours: [],
-            branches_ids: [],
-            department_id: 0,
-            image: null,
-        });
+        setNewDoctor({ name: '', specialty: '', branch_id: 0, department_id: 0, services: '', image: null, priority: 0, is_active: true });
         setImageFile(null);
         setImagePreview(null);
     };
-    const handleDeleteClick = (doctorId) => {
-        setDoctorToDelete(doctorId);
+    const handleDeleteClick = (id) => {
+        setDoctorToDelete(id);
         setDeleteDialogOpen(true);
     };
     const handleConfirmDelete = async () => {
@@ -182,55 +126,23 @@ const DoctorTable = () => {
         setDeleting(true);
         try {
             await axios.delete(`https://www.ss.mastersclinics.com/doctors/${doctorToDelete}`, {
-                headers: {
-                    Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-                },
+                headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
             });
-            setDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
-            setFilteredDoctors(prev => prev.filter(doctor => doctor.id !== doctorToDelete));
+            setDoctors(prev => prev.filter(d => d.id !== doctorToDelete));
+            setFilteredDoctors(prev => prev.filter(d => d.id !== doctorToDelete));
             setDeleteDialogOpen(false);
         }
         catch (err) {
-            setError('فشل في حذف الطبيب');
             console.error(err);
+            setError('فشل الحذف');
         }
         finally {
             setDeleting(false);
             setDoctorToDelete(null);
         }
     };
-    const getBranchName = (id) => {
-        const branch = branchOptions.find(b => b.id === id);
-        return branch ? branch.name : id.toString();
-    };
-    const getDepartmentName = (id) => {
-        const dept = departmentOptions.find(d => d.id === id);
-        return dept ? dept.name : '-';
-    };
-    return (_jsxs(Box, { dir: "rtl", className: "p-5", children: [_jsxs(Box, { display: "flex", gap: 2, mb: 2, children: [_jsx(TextField, { fullWidth: true, label: "\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0644\u0642\u0628 \u0623\u0648 \u0627\u0644\u062A\u062E\u0635\u0635", variant: "outlined", value: searchQuery, onChange: (e) => setSearchQuery(e.target.value) }), _jsx(Button, { variant: "contained", startIcon: _jsx(Add, {}), onClick: () => setOpenAddDialog(true), children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628" })] }), error && (_jsx(Box, { mb: 2, children: _jsx(Typography, { color: "error", children: error }) })), _jsx(TableContainer, { component: Paper, children: _jsxs(Table, { children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: "\u0627\u0644\u0627\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0644\u0642\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0645\u0646\u0635\u0628" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u062A\u062E\u0635\u0635" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0647\u0627\u062A\u0641" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsx(TableBody, { children: loading ? (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: _jsx(LinearProgress, {}) }) })) : filteredDoctors.length > 0 ? (filteredDoctors.map((doctor) => (_jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: doctor.name }), _jsx(TableCell, { align: "center", children: doctor.title || '-' }), _jsx(TableCell, { align: "center", children: doctor.position || '-' }), _jsx(TableCell, { align: "center", children: doctor.practice_area || '-' }), _jsx(TableCell, { align: "center", children: getDepartmentName(doctor.department_id) }), _jsx(TableCell, { align: "center", children: doctor.phone || '-' }), _jsx(TableCell, { align: "center", children: doctor.email || '-' }), _jsx(TableCell, { align: "center", children: _jsxs(Stack, { direction: "row", spacing: 1, justifyContent: "center", children: [_jsx(Link, { to: `/doctors/${doctor.id}`, children: _jsx(Button, { variant: "outlined", size: "small", children: "\u0639\u0631\u0636" }) }), _jsx(IconButton, { color: "error", onClick: () => handleDeleteClick(doctor.id), children: _jsx(Delete, {}) })] }) })] }, doctor.id)))) : (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })) })] }) }), _jsxs(Dialog, { open: deleteDialogOpen, onClose: () => setDeleteDialogOpen(false), children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Typography, { children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u0631\u063A\u0628\u062A\u0643 \u0641\u064A \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0628\u064A\u0628\u061F" }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => setDeleteDialogOpen(false), color: "primary", disabled: deleting, children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: handleConfirmDelete, color: "error", disabled: deleting, startIcon: deleting ? _jsx(CircularProgress, { size: 20 }) : null, children: deleting ? 'جاري الحذف...' : 'حذف' })] })] }), _jsxs(Dialog, { open: openAddDialog, onClose: () => {
-                    setOpenAddDialog(false);
-                    resetForm();
-                }, fullWidth: true, maxWidth: "md", children: [_jsx(DialogTitle, { children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628 \u062C\u062F\u064A\u062F" }), _jsx(DialogContent, { dividers: true, children: _jsxs(Stack, { spacing: 3, sx: { pt: 2 }, children: [_jsx(TextField, { label: "\u0627\u0644\u0627\u0633\u0645 *", name: "name", value: newDoctor.name, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0644\u0642\u0628", name: "title", value: newDoctor.title, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0648\u0635\u0641", name: "description", value: newDoctor.description, onChange: handleInputChange, multiline: true, rows: 3, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u0646\u0635\u0628", name: "position", value: newDoctor.position, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062A\u062E\u0635\u0635", name: "practice_area", value: newDoctor.practice_area, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062E\u0628\u0631\u0629", name: "experience", value: newDoctor.experience, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0639\u0646\u0648\u0627\u0646", name: "address", value: newDoctor.address, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0647\u0627\u062A\u0641", name: "phone", value: newDoctor.phone, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", name: "email", value: newDoctor.email, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062E\u0628\u0631\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629", name: "personal_experience", value: newDoctor.personal_experience, onChange: handleInputChange, multiline: true, rows: 3, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062A\u0639\u0644\u064A\u0645 (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.education?.join(', ') || '', onChange: (e) => handleListChange('education', e.target.value), fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0645\u0647\u0627\u0631\u0627\u062A (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.skills?.join(', ') || '', onChange: (e) => handleListChange('skills', e.target.value), fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u0625\u0646\u062C\u0627\u0632\u0627\u062A (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629)", value: newDoctor.achievements?.join(', ') || '', onChange: (e) => handleListChange('achievements', e.target.value), fullWidth: true }), _jsxs(Box, { children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0627\u0644\u0641\u0631\u0648\u0639" }), _jsx(TextField, { select: true, SelectProps: {
-                                                multiple: true,
-                                                value: newDoctor.branches_ids || [],
-                                                onChange: (e) => {
-                                                    const value = e.target.value;
-                                                    setNewDoctor(prev => ({ ...prev, branches_ids: value }));
-                                                },
-                                                renderValue: (selected) => {
-                                                    const selectedBranches = selected;
-                                                    return selectedBranches.map(id => getBranchName(id)).join(', ');
-                                                },
-                                            }, fullWidth: true, children: branchOptions.map((branch) => (_jsxs(MenuItem, { value: branch.id, children: [_jsx(Checkbox, { checked: newDoctor.branches_ids?.includes(branch.id) || false }), branch.name] }, branch.id))) })] }), _jsxs(Box, { children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(TextField, { select: true, value: newDoctor.department_id || '', onChange: (e) => setNewDoctor(prev => ({
-                                                ...prev,
-                                                department_id: parseInt(e.target.value)
-                                            })), fullWidth: true, children: departmentOptions.map((dept) => (_jsx(MenuItem, { value: dept.id, children: dept.name }, dept.id))) })] }), _jsxs(Box, { children: [_jsx(Typography, { variant: "subtitle1", gutterBottom: true, children: "\u0635\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062E\u0635\u064A" }), _jsxs(Button, { variant: "outlined", component: "label", fullWidth: true, children: ["\u062A\u062D\u0645\u064A\u0644 \u0635\u0648\u0631\u0629", _jsx("input", { type: "file", hidden: true, accept: "image/*", onChange: handleFileChange })] }), imagePreview && (_jsx(Box, { mt: 2, textAlign: "center", children: _jsx("img", { src: imagePreview, alt: "Preview", style: {
-                                                    maxHeight: '200px',
-                                                    maxWidth: '100%',
-                                                    borderRadius: '4px'
-                                                } }) }))] })] }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => {
-                                    setOpenAddDialog(false);
-                                    resetForm();
-                                }, color: "secondary", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: handleSubmit, variant: "contained", color: "primary", disabled: submitting || !newDoctor.name, startIcon: submitting ? _jsx(CircularProgress, { size: 20 }) : _jsx(Save, {}), children: submitting ? 'جاري الحفظ...' : 'حفظ' })] })] })] }));
+    const getBranchName = (id) => branchOptions.find(b => b.id === id)?.name || '';
+    const getDepartmentName = (id) => departmentOptions.find(d => d.id === id)?.name || '';
+    return (_jsxs(Box, { dir: "rtl", className: "p-5", children: [_jsxs(Box, { display: "flex", gap: 2, mb: 2, children: [_jsx(TextField, { fullWidth: true, label: "\u0627\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u062A\u062E\u0635\u0635", variant: "outlined", value: searchQuery, onChange: (e) => setSearchQuery(e.target.value) }), _jsx(Button, { variant: "contained", startIcon: _jsx(Add, {}), onClick: () => setOpenAddDialog(true), children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628" })] }), error && _jsx(Typography, { color: "error", mb: 2, children: error }), _jsx(TableContainer, { component: Paper, children: _jsxs(Table, { children: [_jsx(TableHead, { children: _jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: "\u0627\u0644\u0627\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u062A\u062E\u0635\u0635" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0641\u0631\u0639" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u062E\u062F\u0645\u0627\u062A" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0623\u0648\u0644\u0648\u064A\u0629" }), _jsx(TableCell, { align: "center", children: "\u0646\u0634\u0637" }), _jsx(TableCell, { align: "center", children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A" })] }) }), _jsx(TableBody, { children: loading ? (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: _jsx(LinearProgress, {}) }) })) : filteredDoctors.length ? (filteredDoctors.map(doc => (_jsxs(TableRow, { children: [_jsx(TableCell, { align: "center", children: doc.name }), _jsx(TableCell, { align: "center", children: doc.specialty || '-' }), _jsx(TableCell, { align: "center", children: getBranchName(doc.branch_id) }), _jsx(TableCell, { align: "center", children: getDepartmentName(doc.department_id) }), _jsx(TableCell, { align: "center", children: doc.services?.substring(0, 50) + '...' }), _jsx(TableCell, { align: "center", children: doc.priority }), _jsx(TableCell, { align: "center", children: doc.is_active ? 'نعم' : 'لا' }), _jsx(TableCell, { align: "center", children: _jsxs(Stack, { direction: "row", spacing: 1, justifyContent: "center", children: [_jsx(Link, { to: `/doctors/${doc.id}`, children: _jsx(Button, { variant: "outlined", size: "small", children: "\u0639\u0631\u0636" }) }), _jsx(IconButton, { color: "error", onClick: () => handleDeleteClick(doc.id), children: _jsx(Delete, {}) })] }) })] }, doc.id)))) : (_jsx(TableRow, { children: _jsx(TableCell, { colSpan: 8, align: "center", children: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A" }) })) })] }) }), _jsxs(Dialog, { open: deleteDialogOpen, onClose: () => setDeleteDialogOpen(false), children: [_jsx(DialogTitle, { children: "\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641" }), _jsx(DialogContent, { children: _jsx(Typography, { children: "\u0647\u0644 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0628\u064A\u0628\u061F" }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => setDeleteDialogOpen(false), disabled: deleting, children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: handleConfirmDelete, color: "error", disabled: deleting, children: deleting ? _jsx(CircularProgress, { size: 20 }) : 'حذف' })] })] }), _jsxs(Dialog, { open: openAddDialog, onClose: () => { setOpenAddDialog(false); resetForm(); }, fullWidth: true, maxWidth: "md", children: [_jsx(DialogTitle, { children: "\u0625\u0636\u0627\u0641\u0629 \u0637\u0628\u064A\u0628 \u062C\u062F\u064A\u062F" }), _jsx(DialogContent, { dividers: true, children: _jsxs(Stack, { spacing: 3, pt: 2, children: [_jsx(TextField, { label: "\u0627\u0644\u0627\u0633\u0645", name: "name", value: newDoctor.name, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062A\u062E\u0635\u0635", name: "specialty", value: newDoctor.specialty, onChange: handleInputChange, fullWidth: true }), _jsx(TextField, { label: "\u0627\u0644\u062E\u062F\u0645\u0627\u062A", name: "services", value: newDoctor.services, onChange: handleInputChange, multiline: true, rows: 3, fullWidth: true }), _jsxs(FormControl, { fullWidth: true, children: [_jsx(InputLabel, { children: "\u0627\u0644\u0641\u0631\u0639" }), _jsx(Select, { name: "branch_id", value: newDoctor.branch_id || '', onChange: handleSelectChange, children: branchOptions.map(b => _jsx(MenuItem, { value: b.id, children: b.name }, b.id)) })] }), _jsxs(FormControl, { fullWidth: true, children: [_jsx(InputLabel, { children: "\u0627\u0644\u0642\u0633\u0645" }), _jsx(Select, { name: "department_id", value: newDoctor.department_id || '', onChange: handleSelectChange, children: departmentOptions.map(d => _jsx(MenuItem, { value: d.id, children: d.name }, d.id)) })] }), _jsx(TextField, { label: "\u0627\u0644\u0623\u0648\u0644\u0648\u064A\u0629", name: "priority", type: "number", value: newDoctor.priority, onChange: handleInputChange, fullWidth: true }), _jsx(FormControlLabel, { control: _jsx(Switch, { checked: newDoctor.is_active, onChange: handleSwitchChange }), label: "\u0646\u0634\u0637" }), _jsxs(Box, { children: [_jsx(Typography, { variant: "subtitle1", children: "\u0635\u0648\u0631\u0629 \u0627\u0644\u062D\u0633\u0627\u0628" }), _jsxs(Button, { variant: "outlined", component: "label", fullWidth: true, children: ["\u0631\u0641\u0639 \u0635\u0648\u0631\u0629", _jsx("input", { type: "file", hidden: true, accept: "image/*", onChange: handleFileChange })] }), imagePreview && _jsx(Box, { mt: 2, textAlign: "center", children: _jsx("img", { src: imagePreview, alt: "Preview", style: { maxHeight: 200, maxWidth: '100%', borderRadius: 4 } }) })] })] }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: () => { setOpenAddDialog(false); resetForm(); }, children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx(Button, { onClick: handleSubmit, variant: "contained", color: "primary", disabled: submitting, children: submitting ? _jsx(CircularProgress, { size: 20 }) : 'حفظ' })] })] })] }));
 };
 export default DoctorTable;

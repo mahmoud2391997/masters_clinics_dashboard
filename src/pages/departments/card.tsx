@@ -46,7 +46,8 @@ interface DepartmentStat {
   name: string;
   description: string;
   image?: string;
-  branch_ids?: number[] | string;
+  priority: number;
+    branch_ids?: number[] | string;
 }
 
 interface Props {
@@ -83,6 +84,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
   };
 
   const initialBranchIds = parseBranchIds(department.branch_ids);
+const [priority, setPriority] = useState<number>(department.priority || 0);
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(department.name);
@@ -128,6 +130,7 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
         formData.append("image", imageFile);
       }
       formData.append("branch_ids", JSON.stringify(selectedBranchIds));
+formData.append("priority", priority.toString());
 
       await axios.put(`https://www.ss.mastersclinics.com/departments/${department.id}`, formData, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` }
@@ -223,6 +226,10 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
         />
         <CardContent>
           <Typography variant="body2" color="text.secondary" paragraph>{department.description}</Typography>
+          <Typography variant="body2" color="text.secondary">
+  أولوية الظهور: {priority}
+</Typography>
+
           <Divider sx={{ my: 2 }} />
           <div className="flex flex-wrap gap-2">
             {currentBranchIds.length ? (
@@ -246,10 +253,20 @@ const CardStats: React.FC<Props> = ({ department, branches, onUpdateSuccess, onD
 
         <form onSubmit={handleUpdate}>
           <DialogContent dividers>
+            <TextField
+  fullWidth
+  type="number"
+  label="أولوية الظهور"
+  value={priority}
+  onChange={(e) => setPriority(Number(e.target.value))}
+  margin="normal"
+/>
+
             {updating && <LinearProgress />}
             <Box mb={3}>
               <TextField fullWidth label="اسم القسم" value={name} onChange={(e) => setName(e.target.value)} margin="normal" required variant="outlined" />
               <TextField fullWidth label="الوصف" value={description} onChange={(e) => setDescription(e.target.value)} margin="normal" multiline rows={4} variant="outlined" />
+                
             </Box>
 
             <Box mb={3}>

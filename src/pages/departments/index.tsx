@@ -11,7 +11,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  LinearProgress
+  LinearProgress,
+  Typography
 } from "@mui/material";
 import axios from "axios";
 import CardStats from "./card";
@@ -20,7 +21,6 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { Cancel, Close } from "@mui/icons-material";
 import { Save } from "lucide-react";
-import { Typography } from "@mui/material";
 
 interface Branch {
   id: number;
@@ -32,7 +32,9 @@ interface DepartmentStat {
   name: string;
   description: string;
   image?: string;
+  
   branch_ids?: number[];
+  priority: number;
 }
 
 const DepartmentsStatsGrid: React.FC = () => {
@@ -44,6 +46,7 @@ const DepartmentsStatsGrid: React.FC = () => {
 
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptDesc, setNewDeptDesc] = useState('');
+  const [newDeptPriority, setNewDeptPriority] = useState<number>(0);
   const [newDeptImageFile, setNewDeptImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([]);
@@ -54,30 +57,31 @@ const DepartmentsStatsGrid: React.FC = () => {
     fetchBranches();
   }, []);
 
-const fetchDepartments = async () => {
-  setLoading(true);
-  try {
-    const res = await axios.get("https://www.ss.mastersclinics.com/departments", {
-      headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
-    });
+  const fetchDepartments = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get("https://www.ss.mastersclinics.com/departments", {
+        headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
+      });
+console.log(res.data);
 
-  const parsedDepartments = res.data.map((dept: any) => ({
-  ...dept,
-  branch_ids: typeof dept.branch_ids === "string" && dept.branch_ids !== ""
-    ? JSON.parse(dept.branch_ids)
-    : Array.isArray(dept.branch_ids)
-    ? dept.branch_ids
-    : [],
-}));
-setDepartments(parsedDepartments);
+      const parsedDepartments = res.data.map((dept: any) => ({
+        ...dept,
+        branch_ids: typeof dept.branch_ids === "string" && dept.branch_ids !== ""
+          ? JSON.parse(dept.branch_ids)
+          : Array.isArray(dept.branch_ids)
+            ? dept.branch_ids
+            : [],
+        priority: dept.priority ?? 0
+      }));
 
-  } catch (error) {
-    console.error("خطأ في جلب الأقسام:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setDepartments(parsedDepartments.sort((a: { priority: any; } , b: { priority: any; }) => (a.priority ?? 0) - (b.priority ?? 0)));
+    } catch (error) {
+      console.error("خطأ في جلب الأقسام:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -93,14 +97,12 @@ setDepartments(parsedDepartments);
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // تحقق من نوع الصورة
       if (!file.type.match('image.*')) {
-        alert('يرجى اختيار ملف صورة (JPEG, PNG, إلخ)');
+        alert('يرجى اختيار ملف صورة');
         return;
       }
-      
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        alert('يجب أن يكون حجم الصورة أقل من 5 ميجابايت');
+      if (file.size > 5 * 1024 * 1024) {
+        alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
         return;
       }
 
@@ -127,6 +129,7 @@ setDepartments(parsedDepartments);
       const formData = new FormData();
       formData.append("name", newDeptName);
       formData.append("description", newDeptDesc);
+      formData.append("priority", newDeptPriority.toString());
       if (newDeptImageFile) {
         formData.append("image", newDeptImageFile);
       }
@@ -136,7 +139,15 @@ setDepartments(parsedDepartments);
         headers: { "Authorization": `Bearer ${sessionStorage.getItem("token")}` }
       });
 
-      setDepartments((prev) => [...prev, res.data]);
+      setDepartments((prev) =>
+        [...prev, {
+          ...res.data,
+          branch_ids: typeof res.data.branch_ids === "string"
+            ? JSON.parse(res.data.branch_ids)
+            : res.data.branch_ids,
+          priority: res.data.priority ?? 0
+        }].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+      );
       resetModalFields();
       setShowAddModal(false);
     } catch (error) {
@@ -149,6 +160,7 @@ setDepartments(parsedDepartments);
   const resetModalFields = () => {
     setNewDeptName('');
     setNewDeptDesc('');
+    setNewDeptPriority(0);
     setNewDeptImageFile(null);
     setImagePreview(null);
     setSelectedBranchIds([]);
@@ -158,11 +170,13 @@ setDepartments(parsedDepartments);
     department.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return (
-    <Box display="flex" justifyContent="center" mt={4}>
-      <CircularProgress />
-    </Box>
-  );
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" mt={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <>
@@ -174,9 +188,9 @@ setDepartments(parsedDepartments);
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button 
-          variant="contained" 
-          color="primary" 
+        <Button
+          variant="contained"
+          color="primary"
           onClick={() => setShowAddModal(true)}
           startIcon={<AddPhotoAlternateIcon />}
         >
@@ -196,7 +210,6 @@ setDepartments(parsedDepartments);
         ))}
       </div>
 
-      {/* نافذة إضافة قسم */}
       <Dialog
         open={showAddModal}
         onClose={() => {
@@ -217,39 +230,42 @@ setDepartments(parsedDepartments);
             </IconButton>
           </Box>
         </DialogTitle>
-        
+
         <form onSubmit={handleAddDepartment}>
           <DialogContent dividers>
             {adding && <LinearProgress />}
-            
-            <Box mb={3}>
-              <TextField
-                fullWidth
-                label="اسم القسم"
-                value={newDeptName}
-                onChange={(e) => setNewDeptName(e.target.value)}
-                margin="normal"
-                required
-                variant="outlined"
-              />
-              
-              <TextField
-                fullWidth
-                label="الوصف"
-                value={newDeptDesc}
-                onChange={(e) => setNewDeptDesc(e.target.value)}
-                margin="normal"
-                multiline
-                rows={4}
-                variant="outlined"
-              />
-            </Box>
-            
-            <Box mb={3}>
-              <Typography variant="subtitle1" gutterBottom>
-                صورة القسم
-              </Typography>
-              
+
+            <TextField
+              fullWidth
+              label="اسم القسم"
+              value={newDeptName}
+              onChange={(e) => setNewDeptName(e.target.value)}
+              margin="normal"
+              required
+            />
+
+            <TextField
+              fullWidth
+              label="الوصف"
+              value={newDeptDesc}
+              onChange={(e) => setNewDeptDesc(e.target.value)}
+              margin="normal"
+              multiline
+              rows={4}
+            />
+
+            <TextField
+              fullWidth
+              type="number"
+              label="أولوية الظهور"
+              value={newDeptPriority}
+              onChange={(e) => setNewDeptPriority(Number(e.target.value))}
+              margin="normal"
+              inputProps={{ min: 0 }}
+            />
+
+            <Box mt={3}>
+              <Typography variant="subtitle1">صورة القسم</Typography>
               <Button
                 component="label"
                 variant="outlined"
@@ -265,22 +281,13 @@ setDepartments(parsedDepartments);
                   onChange={handleImageChange}
                 />
               </Button>
-              
+
               {imagePreview && (
-                <Box 
-                  mt={2} 
-                  textAlign="center"
-                  position="relative"
-                >
+                <Box mt={2} position="relative" textAlign="center">
                   <img
                     src={imagePreview}
                     alt="معاينة"
-                    style={{ 
-                      maxHeight: '200px', 
-                      maxWidth: '100%', 
-                      borderRadius: '8px',
-                      border: '1px solid #e0e0e0'
-                    }}
+                    style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: 8, border: '1px solid #ccc' }}
                   />
                   <IconButton
                     onClick={handleRemoveImage}
@@ -290,9 +297,7 @@ setDepartments(parsedDepartments);
                       top: 8,
                       right: 8,
                       backgroundColor: 'rgba(255,255,255,0.7)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.9)'
-                      }
+                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
                     }}
                   >
                     <DeleteIcon fontSize="small" />
@@ -300,16 +305,13 @@ setDepartments(parsedDepartments);
                 </Box>
               )}
             </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle1" gutterBottom>
-                ربط بالفروع
-              </Typography>
-              
+
+            <Box mt={4}>
+              <Typography variant="subtitle1">ربط بالفروع</Typography>
               <Box
                 sx={{
                   maxHeight: 200,
-                  overflow: 'auto',
+                  overflowY: 'auto',
                   p: 1,
                   border: '1px solid',
                   borderColor: 'divider',
@@ -338,25 +340,15 @@ setDepartments(parsedDepartments);
               </Box>
             </Box>
           </DialogContent>
-          
+
           <DialogActions>
-            <Button 
-              onClick={() => {
-                setShowAddModal(false);
-                resetModalFields();
-              }}
-              startIcon={<Cancel />}
-              disabled={adding}
-            >
+            <Button onClick={() => {
+              setShowAddModal(false);
+              resetModalFields();
+            }} startIcon={<Cancel />} disabled={adding}>
               إلغاء
             </Button>
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary"
-              startIcon={<Save />}
-              disabled={adding}
-            >
+            <Button type="submit" variant="contained" startIcon={<Save />} disabled={adding}>
               {adding ? <CircularProgress size={24} /> : 'إضافة القسم'}
             </Button>
           </DialogActions>
