@@ -10,11 +10,21 @@ import ImageIcon from '@mui/icons-material/Image';
 interface Branch {
   id: number;
   name: string;
+  address: string;
+  location_link: string;
+  region_id: number;
+  image_url: string;
+  latitude: number;
+  longitude: number;
 }
 
 interface Department {
   id: number;
   name: string;
+  description: string;
+  imageUrl: string;
+  image: string;
+  priority: number;
 }
 
 interface Doctor {
@@ -29,6 +39,8 @@ interface Doctor {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  branch: Branch | null;
+  department: Department | null;
 }
 
 const DoctorSingle: React.FC = () => {
@@ -62,8 +74,13 @@ const DoctorSingle: React.FC = () => {
         const res = await fetchWithAuth(`https://www.ss.mastersclinics.com/doctors/${id}`);
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data: Doctor = await res.json();
+        
         setDoctor(data);
-        setForm(data);
+        setForm({
+          ...data,
+          branch_id: data.branch?.id,
+          department_id: data.department?.id
+        });
       } catch (err) {
         setSnackbar({ open: true, message: 'حدث خطأ أثناء تحميل بيانات الطبيب', severity: 'error' });
       } finally {
@@ -77,8 +94,12 @@ const DoctorSingle: React.FC = () => {
           fetchWithAuth('https://www.ss.mastersclinics.com/branches'),
           fetchWithAuth('https://www.ss.mastersclinics.com/departments')
         ]);
-        setBranchOptions(await branchesRes.json());
-        setDepartmentOptions(await departmentsRes.json());
+        
+        const branches = await branchesRes.json();
+        const departments = await departmentsRes.json();
+        
+        setBranchOptions(branches);
+        setDepartmentOptions(departments);
       } catch (err) {
         setSnackbar({ open: true, message: 'فشل تحميل الفروع أو الأقسام', severity: 'error' });
       }
@@ -128,8 +149,19 @@ const DoctorSingle: React.FC = () => {
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const updated = await res.json();
-      setDoctor(updated);
-      setForm(updated);
+      
+      setDoctor({
+        ...updated,
+        branch: branchOptions.find(b => b.id === updated.branch_id) || null,
+        department: departmentOptions.find(d => d.id === updated.department_id) || null
+      });
+      
+      setForm({
+        ...updated,
+        branch_id: updated.branch_id,
+        department_id: updated.department_id
+      });
+      
       setImageFile(null);
       setImagePreview(null);
       setEditMode(false);
@@ -152,25 +184,61 @@ const DoctorSingle: React.FC = () => {
           <TextField label="التخصص" value={form.specialty || ''} onChange={(e) => handleChange('specialty', e.target.value)} fullWidth disabled={!editMode} />
           <TextField label="الخدمات" value={form.services || ''} onChange={(e) => handleChange('services', e.target.value)} fullWidth multiline rows={4} disabled={!editMode} />
 
-          <FormControl fullWidth disabled={!editMode}>
-            <InputLabel>الفرع</InputLabel>
-            <Select value={form.branch_id || ''} onChange={(e) => handleChange('branch_id', e.target.value)} label="الفرع">
-              {branchOptions.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}
-            </Select>
-          </FormControl>
+          {/* Branch Section */}
+          {editMode ? (
+            <FormControl fullWidth>
+              <InputLabel>الفرع</InputLabel>
+              <Select 
+                value={form.branch_id || ''} 
+                onChange={(e) => handleChange('branch_id', e.target.value)} 
+                label="الفرع"
+              >
+                {branchOptions.map((branch) => (
+                  <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <TextField 
+              label="الفرع" 
+              value={doctor.branch?.name || 'غير محدد'} 
+              fullWidth 
+              disabled 
+            />
+          )}
 
-          <FormControl fullWidth disabled={!editMode}>
-            <InputLabel>القسم</InputLabel>
-            <Select value={form.department_id || ''} onChange={(e) => handleChange('department_id', e.target.value)} label="القسم">
-              {departmentOptions.map((dep) => <MenuItem key={dep.id} value={dep.id}>{dep.name}</MenuItem>)}
-            </Select>
-          </FormControl>
+          {/* Department Section */}
+          {editMode ? (
+            <FormControl fullWidth>
+              <InputLabel>القسم</InputLabel>
+              <Select 
+                value={form.department_id || ''} 
+                onChange={(e) => handleChange('department_id', e.target.value)} 
+                label="القسم"
+              >
+                {departmentOptions.map((dep) => (
+                  <MenuItem key={dep.id} value={dep.id}>{dep.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <TextField 
+              label="القسم" 
+              value={doctor.department?.name || 'غير محدد'} 
+              fullWidth 
+              disabled 
+            />
+          )}
 
           <TextField label="الأولوية" type="number" value={form.priority ?? 0} onChange={(e) => handleChange('priority', parseInt(e.target.value))} fullWidth disabled={!editMode} />
 
           <FormControl fullWidth disabled={!editMode}>
             <InputLabel>الحالة</InputLabel>
-            <Select value={String(form.is_active ?? true)} onChange={(e) => handleChange('is_active', e.target.value === 'true')} label="الحالة">
+            <Select 
+              value={String(form.is_active ?? true)} 
+              onChange={(e) => handleChange('is_active', e.target.value === 'true')} 
+              label="الحالة"
+            >
               <MenuItem value="true">نشط</MenuItem>
               <MenuItem value="false">غير نشط</MenuItem>
             </Select>
@@ -204,7 +272,16 @@ const DoctorSingle: React.FC = () => {
       {editMode ? (
         <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
           <Button variant="contained" color="primary" startIcon={<Save />} onClick={handleSave}>حفظ</Button>
-          <Button variant="outlined" color="secondary" startIcon={<Cancel />} onClick={() => { setEditMode(false); setImageFile(null); setImagePreview(null); setForm(doctor); }}>إلغاء</Button>
+          <Button variant="outlined" color="secondary" startIcon={<Cancel />} onClick={() => { 
+            setEditMode(false); 
+            setImageFile(null); 
+            setImagePreview(null); 
+            setForm({
+              ...doctor,
+              branch_id: doctor.branch?.id,
+              department_id: doctor.department?.id
+            }); 
+          }}>إلغاء</Button>
         </Stack>
       ) : (
         <Button sx={{ mt: 2 }} variant="outlined" onClick={() => setEditMode(true)}>تعديل البيانات</Button>
