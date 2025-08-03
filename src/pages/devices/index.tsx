@@ -16,7 +16,8 @@ import {
   Row,
   Col,
   Checkbox,
-  Tag
+  Tag,
+  Spin
 } from "antd";
 import { UploadOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { getBranches } from "../../api/regions&branches";
@@ -56,6 +57,7 @@ const arabicText = {
   active: "نشط",
   inactive: "غير نشط",
   priority: "الأولوية",
+  unknownBranch: "فرع غير معروف",
 };
 
 const deviceTypes = [
@@ -68,11 +70,10 @@ const deviceTypes = [
 ];
 
 interface Device {
-  id: number;
   _id: string;
   name: string;
   type: string;
-  branches_ids: string;
+  branches_ids: number[];
   available_times?: string | null;
   image_url?: string | null;
   priority: number;
@@ -113,12 +114,19 @@ const MedicalDevicesPage: React.FC = () => {
           getBranches(),
         ]);
         
+        // Normalize branches data
         const branchesData = (branchesResponse.data as unknown as Branch[]).map(branch => ({
           ...branch,
           id: Number(branch.id),
         }));
 
-        setDevices(devicesResponse as unknown as Device[]);
+        // Normalize devices data
+        const normalizedDevices = (devicesResponse as unknown as Device[]).map(device => ({
+          ...device,
+          branches_ids: device.branches_ids.map(id => Number(id)),
+        }));
+
+        setDevices(normalizedDevices);
         setBranches(branchesData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -129,17 +137,6 @@ const MedicalDevicesPage: React.FC = () => {
     };
     fetchData();
   }, []);
-
-  const parseBranchesIds = (branchesString: string): number[] => {
-    try {
-      // Remove brackets and parse the string to array
-      const cleanedString = branchesString.replace(/[\[\]]/g, '');
-      return cleanedString.split(',').map(id => parseInt(id.trim()));
-    } catch (error) {
-      console.error("Error parsing branches_ids:", error);
-      return [];
-    }
-  };
 
   const handleBeforeUpload = (file: File) => {
     const isImage = file.type.startsWith("image/");
@@ -180,12 +177,10 @@ const MedicalDevicesPage: React.FC = () => {
 
   const handleEdit = (device: Device) => {
     setEditingDevice(device);
-    const branchIds = parseBranchesIds(device.branches_ids);
-    
     form.setFieldsValue({
       name: device.name,
       type: device.type,
-      branches_ids: branchIds,
+      branches_ids: device.branches_ids,
       available_times: device.available_times,
       priority: device.priority,
       is_active: device.is_active,
@@ -193,8 +188,15 @@ const MedicalDevicesPage: React.FC = () => {
     
     if (device.image_url) {
       setImagePreview(getImageUrl(device.image_url));
+      setFileList([{
+        uid: '-1',
+        name: 'existing-image',
+        status: 'done',
+        url: getImageUrl(device.image_url),
+      }]);
     } else {
       setImagePreview("");
+      setFileList([]);
     }
     setIsModalVisible(true);
   };
@@ -231,15 +233,15 @@ const MedicalDevicesPage: React.FC = () => {
       formData.append("priority", values.priority?.toString() || "0");
       formData.append("is_active", values.is_active ? "true" : "false");
       
-      // Convert branches array to string format like "[1,2,3]"
-      const branchesString = `[${values.branches_ids.join(',')}]`;
-      formData.append("branches_ids", branchesString);
+      values.branches_ids.forEach((id: number) => {
+        formData.append("branches_ids[]", id.toString());
+      });
       
       formData.append("available_times", values.available_times || "");
 
       if (fileList.length > 0 && fileList[0].originFileObj) {
         formData.append("image", fileList[0].originFileObj);
-      } else if (editingDevice?.image_url) {
+      } else if (editingDevice?.image_url && !fileList.length) {
         formData.append("keepExistingImage", "true");
       }
 
@@ -310,12 +312,13 @@ const MedicalDevicesPage: React.FC = () => {
       title: arabicText.branches,
       dataIndex: "branches_ids",
       key: "branches",
-      render: (branchesString: string) => {
-        const branchIds = parseBranchesIds(branchesString);
-        return branchIds.map(id => {
-          const branch = branches.find(b => b.id === id);
-          return branch ? branch.name : id;
-        }).join(", ");
+      render: (branchIds: number[]) => {
+        return branchIds
+          .map(id => {
+            const branch = branches.find(b => b.id === id);
+            return branch ? branch.name : `${arabicText.unknownBranch} (ID: ${id})`;
+          })
+          .join(", ");
       }
     },
     {
@@ -358,15 +361,17 @@ const MedicalDevicesPage: React.FC = () => {
           </Button>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={devices}
-          rowKey="_id"
-          bordered
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: true }}
-        />
+        <Spin spinning={loading} tip="جاري التحميل...">
+          <Table
+            columns={columns}
+            dataSource={devices}
+            rowKey="_id"
+            bordered
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            scroll={{ x: true }}
+          />
+        </Spin>
 
         <Modal
           title={editingDevice ? arabicText.editDevice : arabicText.addDevice}
@@ -406,7 +411,7 @@ const MedicalDevicesPage: React.FC = () => {
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item label={arabicText.priority} name="priority">
-                  <Input type="number" placeholder="مثال: 1 (أعلى أولوية)" />
+                  <Input type="number" min={0} placeholder="مثال: 1 (أعلى أولوية)" />
                 </Form.Item>
               </Col>
               <Col span={12}>
