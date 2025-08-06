@@ -44,7 +44,6 @@ import {
   fetchExistingItems,
   updateCurrentLandingPageSettings,
 } from '../../store/slices/landingPageSlice';
-import "./css.css";
 
 interface LandingPageContent {
   landingScreen: {
@@ -116,16 +115,9 @@ const BranchSelector = ({ selectedBranches, onChange }: BranchSelectorProps) => 
 
 const getImageUrl = (image: string | File | undefined): string => {
   if (!image) return "";
-  
-  if (image instanceof File) return "";
-
+  if (image instanceof File) return URL.createObjectURL(image);
   if (/^https?:\/\//.test(image)) return image;
-
-  if (image.startsWith("/public") || image.startsWith("/uploads")) {
-    return `https://www.ss.mastersclinics.com${image}`;
-  }
-
-  return `https://www.ss.mastersclinics.com/public/uploads/${image}`;
+  return `https://www.ss.mastersclinics.com${image}`;
 };
 
 const LandingPageEditor = () => {
@@ -149,9 +141,8 @@ const LandingPageEditor = () => {
     open: boolean;
     type: 'service' | 'offer' | 'doctor' | null;
   }>({ open: false, type: null });
-  const [, setSelectedExistingItem] = useState<any>(null);
+  const [ setSelectedExistingItem] = useState<any>(null);
 
-  // Clean up object URLs when unmounting
   useEffect(() => {
     return () => {
       objectUrls.forEach(url => URL.revokeObjectURL(url));
@@ -202,6 +193,7 @@ const LandingPageEditor = () => {
           })),
         },
       };
+      
       formData.append('data', JSON.stringify(updatedPage));
 
       if (localContent.landingScreen.image instanceof File) {
@@ -248,20 +240,23 @@ const LandingPageEditor = () => {
     }
   };
 
-  const toggleStatus = async () => {
-    if (!currentLandingPage || !id) return;
+const toggleStatus = async () => {
+  if (!currentLandingPage || !id) return;
 
-    try {
-      const updatedPage = {
-        ...currentLandingPage,
-        enabled: !currentLandingPage.enabled,
-      };
-      await dispatch(updateLandingPage({ id, data: updatedPage })).unwrap();
-    } catch (error) {
-      console.error('Failed to toggle status:', error);
-    }
-  };
-
+  try {
+    const formData = new FormData();
+    const updatedPage = {
+      ...currentLandingPage,
+      activated: !currentLandingPage.activated,
+    };
+    
+    formData.append('data', JSON.stringify(updatedPage));
+    
+    await dispatch(updateLandingPage({ id, data: formData })).unwrap();
+  } catch (error) {
+    console.error('Failed to toggle status:', error);
+  }
+};
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'landing' | 'offer' | 'doctor', index?: number) => {
     const file = e.target.files?.[0];
     if (!file || !localContent) return;
@@ -461,11 +456,11 @@ const LandingPageEditor = () => {
                 <FormControlLabel
                   control={
                     <Switch
-                      checked={currentLandingPage.enabled}
+                      checked={currentLandingPage.activated}
                       onChange={toggleStatus}
                     />
                   }
-                  label={currentLandingPage.enabled ? 'مفعلة' : 'معطلة'}
+                  label={currentLandingPage.activated ? 'مفعلة' : 'معطلة'}
                 />
                 <Button
                   variant="outlined"
@@ -524,12 +519,12 @@ const LandingPageEditor = () => {
                   المنصات
                 </Typography>
                 <Box display="flex" flexWrap="wrap" gap={1}>
-                  {Object.entries(currentLandingPage.platforms).map(([platform, enabled]) => (
+                  {Object.entries(currentLandingPage.platforms || {}).map(([platform, enabled]) => (
                     <FormControlLabel
                       key={platform}
                       control={
                         <Switch
-                          checked={enabled}
+                          checked={Boolean(enabled)}
                           onChange={(e) =>
                             dispatch(updateCurrentLandingPageSettings({
                               platforms: {
@@ -551,12 +546,12 @@ const LandingPageEditor = () => {
                   إظهار الأقسام
                 </Typography>
                 <Box display="flex" flexWrap="wrap" gap={1}>
-                  {Object.entries(currentLandingPage.showSections).map(([section, enabled]) => (
+                  {Object.entries(currentLandingPage.showSections || {}).map(([section, enabled]) => (
                     <FormControlLabel
                       key={section}
                       control={
                         <Switch
-                          checked={enabled}
+                          checked={Boolean(enabled)}
                           onChange={(e) =>
                             dispatch(updateCurrentLandingPageSettings({
                               showSections: {
@@ -579,12 +574,12 @@ const LandingPageEditor = () => {
                 <Typography><strong>العنوان:</strong> {currentLandingPage.title}</Typography>
               </Box>
               <Box sx={{ mb: 2 }}>
-                <Typography><strong>الحالة:</strong> {currentLandingPage.enabled ? 'مفعلة' : 'معطلة'}</Typography>
+                <Typography><strong>الحالة:</strong> {currentLandingPage.activated ? 'مفعلة' : 'معطلة'}</Typography>
               </Box>
               <Box>
                 <Typography><strong>المنصات:</strong></Typography>
                 <Box display="flex" flexWrap="wrap" gap={1} mt={1}>
-                  {Object.entries(currentLandingPage.platforms)
+                  {Object.entries(currentLandingPage.platforms || {})
                     .filter(([_, enabled]) => enabled)
                     .map(([platform]) => (
                       <Chip key={platform} label={platform} size="small" />
@@ -597,7 +592,7 @@ const LandingPageEditor = () => {
       </Card>
 
       {/* Landing Screen Section */}
-      {currentLandingPage.showSections.landingScreen && (
+      {currentLandingPage.showSections?.landingScreen && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -704,9 +699,7 @@ const LandingPageEditor = () => {
                 <Box flex={1}>
                   {localContent.landingScreen.image && (
                     <Avatar
-                      src={typeof localContent.landingScreen.image === 'string' 
-                        ? getImageUrl(localContent.landingScreen.image)
-                        : URL.createObjectURL(localContent.landingScreen.image)}
+                      src={getImageUrl(localContent.landingScreen.image)}
                       variant="rounded"
                       sx={{ width: '100%', height: 200 }}
                     />
@@ -719,7 +712,7 @@ const LandingPageEditor = () => {
       )}
 
       {/* Services Section */}
-      {currentLandingPage.showSections.services && (
+      {currentLandingPage.showSections?.services && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -812,7 +805,7 @@ const LandingPageEditor = () => {
       )}
 
       {/* Offers Section */}
-      {currentLandingPage.showSections.offers && (
+      {currentLandingPage.showSections?.offers && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -856,9 +849,7 @@ const LandingPageEditor = () => {
                       <Box textAlign="center" mb={2}>
                         {offer.image && (
                           <Avatar
-                            src={typeof offer.image === 'string' 
-                              ? getImageUrl(offer.image)
-                              : URL.createObjectURL(offer.image)}
+                            src={getImageUrl(offer.image)}
                             variant="rounded"
                             sx={{ width: 120, height: 120, mx: 'auto', mb: 1 }}
                           />
@@ -917,9 +908,7 @@ const LandingPageEditor = () => {
                     <>
                       {offer.image && (
                         <Avatar
-                          src={typeof offer.image === 'string' 
-                            ? getImageUrl(offer.image)
-                            : URL.createObjectURL(offer.image)}
+                          src={getImageUrl(offer.image)}
                           variant="rounded"
                           sx={{ width: '100%', height: 150, mb: 2 }}
                         />
@@ -957,7 +946,7 @@ const LandingPageEditor = () => {
       )}
 
       {/* Doctors Section */}
-      {currentLandingPage.showSections.doctors && (
+      {currentLandingPage.showSections?.doctors && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -1000,9 +989,7 @@ const LandingPageEditor = () => {
                       <Box mb={2}>
                         {doctor.image && (
                           <Avatar
-                            src={typeof doctor.image === 'string' 
-                              ? getImageUrl(doctor.image)
-                              : URL.createObjectURL(doctor.image)}
+                            src={getImageUrl(doctor.image)}
                             sx={{ width: 100, height: 100, mx: 'auto', mb: 1 }}
                           />
                         )}
@@ -1050,9 +1037,7 @@ const LandingPageEditor = () => {
                     <>
                       {doctor.image && (
                         <Avatar
-                          src={typeof doctor.image === 'string' 
-                            ? getImageUrl(doctor.image)
-                            : URL.createObjectURL(doctor.image)}
+                          src={getImageUrl(doctor.image)}
                           sx={{ width: 100, height: 100, mx: 'auto', mb: 2 }}
                         />
                       )}
@@ -1096,7 +1081,7 @@ const LandingPageEditor = () => {
         <DialogContent>
           <List>
             {addItemDialog.type === 'service' &&
-              existingItems.services.map((service) => (
+              existingItems.services?.map((service) => (
                 <ListItem key={service.id} divider>
                   <ListItemText
                     primary={service.name}
@@ -1114,7 +1099,7 @@ const LandingPageEditor = () => {
               ))}
 
             {addItemDialog.type === 'offer' &&
-              existingItems.offers.map((offer) => (
+              existingItems.offers?.map((offer) => (
                 <ListItem key={offer.id} divider>
                   <ListItemText
                     primary={offer.title}
@@ -1132,7 +1117,7 @@ const LandingPageEditor = () => {
               ))}
 
             {addItemDialog.type === 'doctor' &&
-              existingItems.doctors.map((doctor) => (
+              existingItems.doctors?.map((doctor) => (
                 <ListItem key={doctor.id} divider>
                   <ListItemText
                     primary={doctor.name}

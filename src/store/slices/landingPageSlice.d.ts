@@ -47,7 +47,7 @@ interface LandingPage {
         doctors: boolean;
     };
     content: LandingPageContent;
-    enabled: boolean;
+    activated: boolean;
 }
 interface LandingPageState {
     landingPages: LandingPage[];

@@ -50,7 +50,7 @@ interface LandingPage {
     doctors: boolean;
   };
   content: LandingPageContent;
-  enabled: boolean;
+  activated: boolean;
 }
 
 interface LandingPageState {
@@ -146,6 +146,8 @@ export const updateLandingPage = createAsyncThunk(
 
       return await response.json();
     } catch (error) {
+      console.log(error);
+      
       console.error('Error updating landing page:', error);
       return rejectWithValue('فشل في تحديث صفحة الهبوط');
     }

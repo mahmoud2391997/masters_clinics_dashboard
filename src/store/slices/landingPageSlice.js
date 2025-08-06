@@ -61,6 +61,7 @@ export const updateLandingPage = createAsyncThunk('landingPages/update', async (
         return await response.json();
     }
     catch (error) {
+        console.log(error);
         console.error('Error updating landing page:', error);
         return rejectWithValue('فشل في تحديث صفحة الهبوط');
     }
