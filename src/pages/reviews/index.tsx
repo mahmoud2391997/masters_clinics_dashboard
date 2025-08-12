@@ -1,6 +1,8 @@
+
 import { useState, useEffect, useRef } from 'react';
-import { FiEdit2, FiTrash2, FiPlus, FiSearch, FiUpload, FiStar } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiPlus, FiSearch, FiUpload, FiStar, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import Swal from 'sweetalert2';
+import { getImageUrl } from '../../hooks/imageUrl';
 
 interface Testimonial {
   id: number;
@@ -8,7 +10,8 @@ interface Testimonial {
   des: string;
   title: string;
   sub: string;
-  rating: number; // Added rating field
+  rating: number;
+  is_active: boolean;
 }
 
 export default function TestimonialsDashboard() {
@@ -24,7 +27,8 @@ export default function TestimonialsDashboard() {
     des: '', 
     title: '', 
     sub: '',
-    rating: 5 // Default to 5 stars
+    rating: 5,
+    is_active: true
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +105,39 @@ export default function TestimonialsDashboard() {
 
   const totalPages = Math.ceil(filteredTestimonials.length / itemsPerPage);
 
+  const toggleActivation = async (id: number, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`https://www.ss.mastersclinics.com/testimonials/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: !currentStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle activation status');
+      }
+
+      setTestimonials(testimonials.map(t => 
+        t.id === id ? { ...t, is_active: !currentStatus } : t
+      ));
+      
+      Swal.fire(
+        'تم التحديث!',
+        'تم تغيير حالة التفعيل بنجاح.',
+        'success'
+      );
+    } catch (err) {
+      Swal.fire({
+        title: 'خطأ!',
+        text: 'فشل تغيير حالة التفعيل',
+        icon: 'error',
+        confirmButtonText: 'حسناً'
+      });
+    }
+  };
+
   const handleDelete = async (id: number) => {
     Swal.fire({
       title: 'هل أنت متأكد؟',
@@ -156,6 +193,7 @@ export default function TestimonialsDashboard() {
       formData.append('sub', editingTestimonial.sub);
       formData.append('des', editingTestimonial.des);
       formData.append('rating', editingTestimonial.rating.toString());
+      formData.append('is_active', editingTestimonial.is_active.toString());
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -172,7 +210,6 @@ export default function TestimonialsDashboard() {
 
       const updatedTestimonial = await response.json();
 
-      // Refresh local list
       setTestimonials(testimonials.map(t =>
         t.id === editingTestimonial.id ? updatedTestimonial : t
       ));
@@ -218,6 +255,7 @@ export default function TestimonialsDashboard() {
       formData.append('sub', newTestimonial.sub);
       formData.append('des', newTestimonial.des);
       formData.append('rating', newTestimonial.rating.toString());
+      formData.append('is_active', newTestimonial.is_active.toString());
 
       const response = await fetch('https://www.ss.mastersclinics.com/testimonials', {
         method: 'POST',
@@ -231,7 +269,7 @@ export default function TestimonialsDashboard() {
       const addedTestimonial = await response.json();
       setTestimonials([addedTestimonial, ...testimonials]);
       setIsAddModalOpen(false);
-      setNewTestimonial({ img: '', des: '', title: '', sub: '', rating: 5 });
+      setNewTestimonial({ img: '', des: '', title: '', sub: '', rating: 5, is_active: true });
       setImageFile(null);
       setImagePreview(null);
       Swal.fire(
@@ -365,7 +403,7 @@ export default function TestimonialsDashboard() {
                 <div className="mr-5 w-0 flex-1">
                   <dt className="text-sm font-medium text-gray-500 truncate">نشطة</dt>
                   <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">{testimonials.length}</div>
+                    <div className="text-2xl font-semibold text-gray-900">{testimonials.filter(t => t.is_active).length}</div>
                   </dd>
                 </div>
               </div>
@@ -426,6 +464,9 @@ export default function TestimonialsDashboard() {
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     الرأي
                   </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    الحالة
+                  </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     الإجراءات
                   </th>
@@ -437,7 +478,7 @@ export default function TestimonialsDashboard() {
                     <tr key={testimonial.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <img className="h-10 w-10 rounded-full object-cover" src={testimonial.img} alt={testimonial.title} />
+                          <img className="h-10 w-10 rounded-full object-cover" src={getImageUrl(testimonial.img)} alt={testimonial.title} />
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -452,7 +493,26 @@ export default function TestimonialsDashboard() {
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-500 line-clamp-2">{testimonial.des}</div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          testimonial.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {testimonial.is_active ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                        <button
+                          onClick={() => toggleActivation(testimonial.id, testimonial.is_active)}
+                          className={`p-1 rounded-full focus:outline-none ${
+                            testimonial.is_active ? 'text-green-500' : 'text-gray-400'
+                          }`}
+                        >
+                          {testimonial.is_active ? (
+                            <FiToggleRight className="h-6 w-6" />
+                          ) : (
+                            <FiToggleLeft className="h-6 w-6" />
+                          )}
+                        </button>
                         <button
                           onClick={() => handleEdit(testimonial)}
                           className="text-indigo-600 hover:text-indigo-900 ml-3"
@@ -470,7 +530,7 @@ export default function TestimonialsDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
                       لا توجد آراء متاحة
                     </td>
                   </tr>
@@ -603,6 +663,32 @@ export default function TestimonialsDashboard() {
                       onChange={(e) => setEditingTestimonial({...editingTestimonial, des: e.target.value})}
                     ></textarea>
                   </div>
+                  <div className="flex items-center">
+                    <label htmlFor="edit-active" className="block text-sm font-medium text-gray-700 mr-3">
+                      الحالة:
+                    </label>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                      <input
+                        type="checkbox"
+                        id="edit-active"
+                        checked={editingTestimonial.is_active}
+                        onChange={(e) => setEditingTestimonial({
+                          ...editingTestimonial,
+                          is_active: e.target.checked
+                        })}
+                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                      />
+                      <label
+                        htmlFor="edit-active"
+                        className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${
+                          editingTestimonial.is_active ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      ></label>
+                    </div>
+                    <span className="text-sm text-gray-700">
+                      {editingTestimonial.is_active ? 'نشط' : 'غير نشط'}
+                    </span>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">صورة الشهادة</label>
                     <input
@@ -690,9 +776,8 @@ export default function TestimonialsDashboard() {
                       id="add-sub"
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       value={newTestimonial.sub}
-                      onChange={(e) => setNewTestimonial({...newTestimonial, sub: e.target.value})}
-                    />
-                  </div>
+                      onChange={(e) => setNewTestimonial({...newTestimonial, sub: e.target.value})  }/>
+                                      </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">التقييم</label>
                     <StarRatingInput 
@@ -709,6 +794,32 @@ export default function TestimonialsDashboard() {
                       value={newTestimonial.des}
                       onChange={(e) => setNewTestimonial({...newTestimonial, des: e.target.value})}
                     ></textarea>
+                  </div>
+                  <div className="flex items-center">
+                    <label htmlFor="add-active" className="block text-sm font-medium text-gray-700 mr-3">
+                      الحالة:
+                    </label>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                      <input
+                        type="checkbox"
+                        id="add-active"
+                        checked={newTestimonial.is_active}
+                        onChange={(e) => setNewTestimonial({
+                          ...newTestimonial,
+                          is_active: e.target.checked
+                        })}
+                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                      />
+                      <label
+                        htmlFor="add-active"
+                        className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${
+                          newTestimonial.is_active ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      ></label>
+                    </div>
+                    <span className="text-sm text-gray-700">
+                      {newTestimonial.is_active ? 'نشط' : 'غير نشط'}
+                    </span>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">صورة الشهادة</label>

@@ -18,7 +18,8 @@ const BlogsPage: React.FC = () => {
     author: "",
     content: "",
     image: "",
-    created_at:""
+    created_at: "",
+    is_active: 1 // Add is_active to form state
   });
 
   useEffect(() => {
@@ -63,6 +64,7 @@ const BlogsPage: React.FC = () => {
       formData.append("title2", form.title2);
       formData.append("author", form.author);
       formData.append("content", form.content || "");
+      formData.append("is_active", form.is_active ? "true" : "false");
 
       if (form.imageFile) {
         formData.append("image", form.imageFile);
@@ -80,7 +82,8 @@ const BlogsPage: React.FC = () => {
         author: "",
         content: "",
         image: "",
-        created_at:"",
+        created_at: "",
+        is_active: 1,
         imageFile: undefined,
       });
 
@@ -103,6 +106,36 @@ const BlogsPage: React.FC = () => {
       }
     }
   };
+
+const handleToggleActive = async (id: number, currentStatus: number) => {
+  const newStatus = currentStatus === 1 ? 0 : 1;
+  
+  try {
+    // Optimistically update UI first
+    setBlogs(prevBlogs => 
+      prevBlogs.map(blog => 
+        blog.id === id ? { ...blog, is_active: newStatus } : blog
+      )
+    );
+
+    // Then make API call
+    await axios.put(`https://www.ss.mastersclinics.com/blogs/${id}`, {
+      is_active: newStatus
+    });
+
+    toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المدونة بنجاح`);
+  } catch (error) {
+    console.error("فشل في تغيير حالة المدونة:", error);
+    toast.error("فشل في تغيير حالة المدونة");
+    
+    // Revert state on error
+    setBlogs(prevBlogs => 
+      prevBlogs.map(blog => 
+        blog.id === id ? { ...blog, is_active: currentStatus } : blog
+      )
+    );
+  }
+};
 
   const filteredBlogs = blogs.filter((blog) =>
     blog.title2?.toLowerCase().includes(search.toLowerCase())
@@ -210,6 +243,18 @@ const BlogsPage: React.FC = () => {
                     className="w-full p-2 border border-gray-300 rounded-lg"
                   />
                 </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_active"
+                    checked={form.is_active === 1}
+                    onChange={(e) => setForm({ ...form, is_active: +e.target.checked })}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
+                    تفعيل المدونة
+                  </label>
+                </div>
                 <button
                   type="submit"
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
@@ -226,16 +271,39 @@ const BlogsPage: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredBlogs.map((blog) => (
-                  <div key={blog.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-200 relative">
-                    <button
-                      onClick={() => handleDeleteBlog(blog.id)}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
-                      title="حذف المدونة"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                  <div key={blog.id} className={`bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-200 relative ${!blog.is_active ? 'opacity-70' : ''}`}>
+                    <div className="absolute top-2 right-2 flex space-x-2">
+                      <button
+                        onClick={() => handleToggleActive(blog.id, blog.is_active)}
+                        className={`p-2 rounded-full ${blog.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white transition`}
+                        title={blog.is_active ? "تعطيل المدونة" : "تفعيل المدونة"}
+                      >
+                        {blog.is_active ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBlog(blog.id)}
+                        className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
+                        title="حذف المدونة"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {!blog.is_active && (
+                      <div className="absolute top-2 left-2 bg-gray-500 text-white text-xs px-2 py-1 rounded">
+                        معطلة
+                      </div>
+                    )}
 
                     <div className="h-48 overflow-hidden">
                       <img

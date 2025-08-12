@@ -10,4 +10,5 @@ export interface Blog {
   image?: string;
   create_at?: string;
   date?: string;
+  is_active:number;
 }

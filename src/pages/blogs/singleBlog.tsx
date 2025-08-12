@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './BlogSinglePage.css';
 import { getImageUrl } from '../../hooks/imageUrl';
+import { toast } from 'react-toastify';
 
 interface Blog {
   id: number;
@@ -16,6 +17,7 @@ interface Blog {
   created_at: string;
   updated_at: string;
   comment: number;
+  is_active: number; // Add is_active to the interface
 }
 
 const BlogSinglePage: React.FC = () => {
@@ -75,6 +77,14 @@ const BlogSinglePage: React.FC = () => {
     }));
   };
 
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setEditedBlog(prev => ({
+      ...prev,
+      [name]: checked,
+    }));
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -87,6 +97,27 @@ const BlogSinglePage: React.FC = () => {
       reader.readAsDataURL(file);
     }
   };
+
+const handleToggleActive = async () => {
+  if (!blog) return;
+
+  try {
+    setLoading(true);
+    const newStatus = blog.is_active === 1 ? 0 : 1;
+    
+   await axios.put(`https://www.ss.mastersclinics.com/blogs/${blog.id}`, {
+      is_active: newStatus
+    });
+    
+    setBlog({ ...blog, is_active: newStatus });
+    toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المقال بنجاح`);
+  } catch (error) {
+    console.error("فشل في تغيير حالة المقال:", error);
+    toast.error("فشل في تغيير حالة المقال");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSave = async () => {
     try {
@@ -115,9 +146,11 @@ const BlogSinglePage: React.FC = () => {
       setImagePreview(getImageUrl(response.data.image));
       setIsEditing(false);
       setImageFile(null);
+      toast.success('تم تحديث المقال بنجاح');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل في تحديث المقال');
       console.error('Error updating blog:', err);
+      toast.error('فشل في تحديث المقال');
     } finally {
       setLoading(false);
     }
@@ -148,7 +181,7 @@ const BlogSinglePage: React.FC = () => {
   if (!blog) return null;
 
   return (
-    <article className="blog-single">
+    <article className={`blog-single ${!blog.is_active ? 'inactive-blog' : ''}`}>
       {isEditing ? (
         <div className="edit-controls">
           <div className="form-group">
@@ -179,6 +212,27 @@ const BlogSinglePage: React.FC = () => {
               onChange={handleInputChange}
               rows={6}
             />
+          </div>
+
+      <div className="form-group">
+  <label>تفعيل المقال:</label>
+  <input
+    type="checkbox"
+    name="is_active"
+    checked={editedBlog.is_active === 1}  // Changed from ?? true to === 1
+    onChange={(e) => {
+      handleCheckboxChange({
+        ...e,
+        target: {
+          ...e.target,
+          name: e.target.name,
+          checked: e.target.checked,
+          value: e.target.checked ? '1' : '0'  // Convert to string if needed
+        }
+      });
+    }}
+    className="active-checkbox"
+  />
           </div>
 
           <div className="form-group">
@@ -230,6 +284,12 @@ const BlogSinglePage: React.FC = () => {
         </div>
       ) : (
         <>
+          {!blog.is_active && (
+            <div className="inactive-badge">
+              <span>معطلة</span>
+            </div>
+          )}
+
           <img
             src={currentImage}
             alt={blog.title2}
@@ -261,6 +321,13 @@ const BlogSinglePage: React.FC = () => {
           <div className="button-group">
             <button onClick={() => setIsEditing(true)} className="edit-button">
               تعديل المقال
+            </button>
+            <button 
+              onClick={handleToggleActive} 
+              className={`toggle-active-button ${blog.is_active ? 'deactivate' : 'activate'}`}
+              disabled={loading}
+            >
+              {blog.is_active ? 'تعطيل المقال' : 'تفعيل المقال'}
             </button>
             <button onClick={() => navigate('/blogs')} className="back-button">
               الرجوع إلى جميع المقالات
