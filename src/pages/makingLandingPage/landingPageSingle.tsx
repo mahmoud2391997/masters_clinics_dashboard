@@ -168,57 +168,57 @@ const LandingPageEditor = () => {
     return url;
   }, []);
 
-  const handleSave = async () => {
-    if (!id || !currentLandingPage || !localContent) return;
+const handleSave = async () => {
+  if (!id || !currentLandingPage || !localContent) return;
 
-    try {
-      const formData = new FormData();
-      const updatedPage = {
-        ...currentLandingPage,
-        content: {
-          ...localContent,
-          landingScreen: {
-            ...localContent.landingScreen,
-            image: typeof localContent.landingScreen.image === 'string' 
-              ? localContent.landingScreen.image 
-              : '',
-          },
-          offers: localContent.offers.map(offer => ({
-            ...offer,
-            image: typeof offer.image === 'string' ? offer.image : '',
-          })),
-          doctors: localContent.doctors.map(doctor => ({
-            ...doctor,
-            image: typeof doctor.image === 'string' ? doctor.image : '',
-          })),
-        },
-      };
-      
-      formData.append('data', JSON.stringify(updatedPage));
+  try {
+    const formData = new FormData();
+    
+    // Prepare the updated page data
+    const updatedPage = {
+      ...currentLandingPage,
+      content: localContent,
+      platforms: currentLandingPage.platforms,
+      showSections: currentLandingPage.showSections,
+      activated: currentLandingPage.activated
+    };
+    
+    // Append the JSON data
+    formData.append('data', JSON.stringify(updatedPage));
 
-      if (localContent.landingScreen.image instanceof File) {
-        formData.append('landingImage', localContent.landingScreen.image);
-      }
-
-      localContent.offers.forEach((offer) => {
-        if (offer.image instanceof File) {
-          formData.append(`offerImages`, offer.image);
-        }
-      });
-
-      localContent.doctors.forEach((doctor) => {
-        if (doctor.image instanceof File) {
-          formData.append(`doctorImages`, doctor.image);
-        }
-      });
-
-      await dispatch(updateLandingPage({ id, data: formData })).unwrap();
-      setIsEditing(false);
-      setImagePreview(null);
-    } catch (error) {
-      console.error('Failed to save:', error);
+    // Handle landing screen image
+    if (localContent.landingScreen.image instanceof File) {
+      formData.append('landingImage', localContent.landingScreen.image);
     }
-  };
+
+    // Handle offer images
+    localContent.offers.forEach((offer, index) => {
+      if (offer.image instanceof File) {
+        formData.append('offerImages', offer.image);
+      }
+    });
+
+    // Handle doctor images
+    localContent.doctors.forEach((doctor, index) => {
+      if (doctor.image instanceof File) {
+        formData.append('doctorImages', doctor.image);
+      }
+    });
+
+    // Dispatch the update action
+    await dispatch(updateLandingPage({ id, data: formData })).unwrap();
+    
+    // Refresh the data
+    dispatch(fetchLandingPageById(id));
+    setIsEditing(false);
+    setImagePreview(null);
+    
+  } catch (error) {
+    console.error('Failed to save:', error);
+    // Show error to user
+    alert('Failed to save changes: ' + error);
+  }
+};
 
   const handleCancel = () => {
     if (currentLandingPage) {

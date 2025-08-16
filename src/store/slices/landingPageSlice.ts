@@ -123,33 +123,25 @@ export const fetchLandingPageById = createAsyncThunk(
 
 export const updateLandingPage = createAsyncThunk(
   'landingPages/update',
-  async ({ id, data }: { id: string; data: any }, { rejectWithValue }) => {
-    console.log(data);
-    
+  async ({ id, data }: { id: string; data: FormData }, { rejectWithValue }) => {
     try {
-   
-
       const response = await fetch(`https://www.ss.mastersclinics.com/landingPage/${id}`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-          // DO NOT manually set 'Content-Type' for multipart/form-data
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
         },
         body: data,
       });
 
       if (!response.ok) {
-        console.log(response);
-        
-        throw new Error('Failed to update landing page');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update landing page');
       }
 
-      return await response.json();
-    } catch (error) {
-      console.log(error);
-      
-      console.error('Error updating landing page:', error);
-      return rejectWithValue('فشل في تحديث صفحة الهبوط');
+      const result = await response.json();
+      return result.landingPage; // Return the updated page data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update landing page');
     }
   }
 );
