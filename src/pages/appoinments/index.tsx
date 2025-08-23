@@ -4,13 +4,58 @@ import {
   Box, TextField, MenuItem, TableContainer, Paper, Table, TableHead,
   TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, List, ListItem, ListItemText, Typography, IconButton,
-  ListItemSecondaryAction, Chip, Tooltip, Alert
+  ListItemSecondaryAction, Chip, Tooltip, Alert, Popover
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { updateAppointments, deleteAppointment } from '../../api/landingPages';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+
+// API functions
+const updateAppointments = async (id: string, data: Partial<Appointment>) => {
+  try {
+    const token = sessionStorage.getItem('token');
+    const response = await fetch(`https://www.ss.mastersclinics.com/appointments/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update appointment');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating appointment:', error);
+    throw error;
+  }
+};
+
+const deleteAppointment = async (id: string) => {
+  try {
+    const token = sessionStorage.getItem('token');
+    const response = await fetch(`https://www.ss.mastersclinics.com/appointments/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete appointment');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting appointment:', error);
+    throw error;
+  }
+};
 
 interface DataTableProps {
   formFields?: FormField[];
@@ -32,6 +77,7 @@ interface Appointment {
   phone: string;
   branch: string;
   createdAt: string;
+  scheduledAt?: string;
   landingPageId: string;
   utmSource?: string;
   doctor?: string;
@@ -66,6 +112,10 @@ interface State {
   appointmentToDelete: string | null;
   currentPage: number;
   totalPages: number;
+  scheduleAnchorEl: HTMLElement | null;
+  schedulingAppointment: Appointment | null;
+  newScheduledDateTime: string;
+  isScheduling: boolean;
 }
 
 const statusColors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
@@ -112,6 +162,10 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     appointmentToDelete: null,
     currentPage: 1,
     totalPages: 1,
+    scheduleAnchorEl: null,
+    schedulingAppointment: null,
+    newScheduledDateTime: '',
+    isScheduling: false,
   });
 
   const {
@@ -120,7 +174,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     newCallLogStatus, newCallLogNotes,
     editingLogId, editedLogStatus, editedLogNotes,
     deleteConfirmOpen, appointmentToDelete,
-    currentPage, totalPages,
+    currentPage, totalPages, scheduleAnchorEl,
+    schedulingAppointment, newScheduledDateTime, isScheduling
   } = state;
 
   const role = userRole || (sessionStorage.getItem("role") ?? 'customercare');
@@ -229,6 +284,99 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       selectedAppointment: null,
       editingLogId: null
     }));
+  };
+
+  const openSchedulePopup = (event: React.MouseEvent<HTMLElement>, appointment: Appointment) => {
+    setState(prev => ({
+      ...prev,
+      scheduleAnchorEl: event.currentTarget,
+      schedulingAppointment: appointment,
+      newScheduledDateTime: appointment.scheduledAt || new Date().toISOString().slice(0, 16)
+    }));
+  };
+
+  const closeSchedulePopup = () => {
+    setState(prev => ({
+      ...prev,
+      scheduleAnchorEl: null,
+      schedulingAppointment: null,
+      newScheduledDateTime: '',
+      isScheduling: false
+    }));
+  };
+
+const scheduleAppointment = async () => {
+  if (!schedulingAppointment || !newScheduledDateTime) return;
+
+  setState(prev => ({ ...prev, isScheduling: true, error: null }));
+
+  try {
+    // Step 1: Update scheduledAt
+    await updateAppointments(schedulingAppointment.id, { 
+      scheduledAt: newScheduledDateTime 
+    }).catch(err => {
+      console.error("Error updating scheduledAt:", err);
+      throw new Error("فشل تحديث موعد الحجز");
+    });
+
+    // Step 2: Add a call log entry for the scheduling action
+    const schedulingLog: CallLog = {
+      timestamp: new Date().toISOString(),
+      status: "تم الحجز",
+      notes: `تم تحديد موعد الحجز: ${new Date(newScheduledDateTime).toLocaleString("ar-EG")}`,
+      agentName: username || "غير معروف",
+    };
+
+    const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog];
+
+    await updateAppointments(schedulingAppointment.id, { callLogs: updatedLogs })
+      .catch(err => {
+        console.error("Error updating callLogs:", err);
+        throw new Error("فشل تحديث سجل المكالمات");
+      });
+
+    // Step 3: Refresh data
+    await fetchData();
+    closeSchedulePopup();
+  } catch (err: any) {
+    console.error("Failed to schedule appointment (trace):", err);
+    setState(prev => ({ ...prev, error: err.message || "فشل في تحديد الموعد" }));
+  } finally {
+    setState(prev => ({ ...prev, isScheduling: false }));
+  }
+};
+
+
+  const unscheduleAppointment = async () => {
+    if (!schedulingAppointment) return;
+
+    setState(prev => ({ ...prev, isScheduling: true }));
+
+    try {
+   await updateAppointments(schedulingAppointment.id, { 
+  scheduledAt: undefined 
+});
+
+
+      // Add a call log entry for the unscheduling action
+      const unschedulingLog: CallLog = {
+        timestamp: new Date().toISOString(),
+        status: 'تم إلغاء الحجز',
+        notes: 'تم إلغاء موعد الحجز',
+        agentName: username || 'غير معروف'
+      };
+
+      const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog];
+      await updateAppointments(schedulingAppointment.id, { callLogs: updatedLogs });
+
+      await fetchData(); // Refresh data
+      closeSchedulePopup();
+    } catch (err) {
+      console.error('Failed to unschedule appointment:', err);
+      setState(prev => ({ ...prev, error: 'فشل في إلغاء الموعد' }));
+    } finally {
+      setState(prev => ({ ...prev, isScheduling: false }));
+    }
   };
 
   const addNewCallLog = async () => {
@@ -364,6 +512,14 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     </Box>
   );
 
+  const renderScheduledAt = (scheduledAt: string | undefined) => {
+    if (!scheduledAt) return '-';
+    return new Date(scheduledAt).toLocaleString('ar-EG');
+  };
+
+  const isScheduleOpen = Boolean(scheduleAnchorEl);
+  const scheduleId = isScheduleOpen ? 'schedule-popover' : undefined;
+
   return (
     <>
       <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -394,25 +550,26 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               {visibleFormFields.map(field => (
                 <TableCell key={field.key} align="left">{field.label}</TableCell>
               ))}
+              <TableCell>موعد الحجز</TableCell>
               <TableCell>آخر حالة</TableCell>
               <TableCell>سجلات الاتصال</TableCell>
-              {role === 'mediabuyer' && <TableCell>إجراءات</TableCell>}
+              <TableCell>إجراءات</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 3} align="center">... جاري التحميل</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 4} align="center">... جاري التحميل</TableCell>
               </TableRow>
             )}
             {error && (
               <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 3} align="center" sx={{ color: 'red' }}>{error}</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 4} align="center" sx={{ color: 'red' }}>{error}</TableCell>
               </TableRow>
             )}
             {!loading && filteredData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 3} align="center">لا توجد بيانات</TableCell>
+                <TableCell colSpan={visibleFormFields.length + 4} align="center">لا توجد بيانات</TableCell>
               </TableRow>
             )}
             {filteredData.map(row => {
@@ -428,6 +585,20 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                           : (row[field.key] ?? '-')}
                     </TableCell>
                   ))}
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <span>{renderScheduledAt(row.scheduledAt)}</span>
+                      {(role === 'customercare' || role === 'admin') && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => openSchedulePopup(e, row)}
+                          color={row.scheduledAt ? "primary" : "default"}
+                        >
+                          <ScheduleIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </TableCell>
                   <TableCell>
                     {lastCall ? (
                       <Tooltip title={`${new Date(lastCall.timestamp).toLocaleString('ar-EG')} - ${lastCall.agentName}`}>
@@ -452,8 +623,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                       عرض ({(row.callLogs?.length) || 0})
                     </Button>
                   </TableCell>
-                  {role === 'mediabuyer' && (
-                    <TableCell>
+                  <TableCell>
+                    {role === 'mediabuyer' && (
                       <Button
                         variant="outlined"
                         color="error"
@@ -461,16 +632,76 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                         onClick={() => openDeleteConfirm(row.id)}
                         startIcon={<DeleteIcon fontSize="small" />}
                       >
-                        حذف الموعد
+                        حذف
                       </Button>
-                    </TableCell>
-                  )}
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Schedule Popover */}
+      <Popover
+        id={scheduleId}
+        open={isScheduleOpen}
+        anchorEl={scheduleAnchorEl}
+        onClose={closeSchedulePopup}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, minWidth: 300 }}>
+          <Typography variant="h6" gutterBottom>
+            تحديد موعد الحجز
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {schedulingAppointment?.name} - {schedulingAppointment?.phone}
+          </Typography>
+          
+          <TextField
+            type="datetime-local"
+            label="تاريخ ووقت الموعد"
+            value={newScheduledDateTime}
+            onChange={(e) => setState(prev => ({ ...prev, newScheduledDateTime: e.target.value }))}
+            fullWidth
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+          />
+          
+          <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'space-between' }}>
+            {schedulingAppointment?.scheduledAt && (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={unscheduleAppointment}
+                disabled={isScheduling}
+              >
+                إلغاء الموعد
+              </Button>
+            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button onClick={closeSchedulePopup} disabled={isScheduling}>
+                إلغاء
+              </Button>
+              <Button
+                variant="contained"
+                onClick={scheduleAppointment}
+                disabled={isScheduling || !newScheduledDateTime}
+              >
+                {isScheduling ? 'جاري الحفظ...' : 'حفظ الموعد'}
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </Popover>
 
       {/* Pagination Controls */}
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 1 }}>
@@ -506,6 +737,11 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               )}
               {selectedAppointment?.offer && (
                 <Typography variant="body2">العرض: {selectedAppointment.offer}</Typography>
+              )}
+              {selectedAppointment?.scheduledAt && (
+                <Typography variant="body2" color="primary">
+                  موعد الحجز: {new Date(selectedAppointment.scheduledAt).toLocaleString('ar-EG')}
+                </Typography>
               )}
             </Box>
           </Box>
