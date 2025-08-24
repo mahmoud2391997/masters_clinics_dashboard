@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import type { ChangeEvent } from "react"
 import {
   Box,
@@ -35,6 +35,72 @@ import CloseIcon from "@mui/icons-material/Close"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import ScheduleIcon from "@mui/icons-material/Schedule"
+import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker"
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns"
+import { ar } from "date-fns/locale"
+
+// Interfaces
+interface FormField {
+  key: string
+  label?: string
+}
+
+interface CallLog {
+  id?: string
+  timestamp: string
+  status: string
+  notes?: string
+  agentName?: string
+  editedBy?: string
+}
+
+interface Appointment {
+  id: string
+  _id?: string
+  name: string
+  phone: string
+  branch: string
+  createdAt: string
+  scheduledAt?: string | null
+  landingPageId: string
+  utmSource?: string
+  doctor?: string
+  offer?: string
+  callLogs?: CallLog[]
+  [key: string]: any
+}
+
+interface DataTableProps {
+  formFields?: FormField[]
+  data?: Appointment[]
+  onDelete?: (id: string) => void
+  onView?: (row: Appointment) => void
+  userRole: "customercare" | "mediabuyer" | "admin"
+}
+
+interface State {
+  search: string
+  branchFilter: string
+  loading: boolean
+  error: string | null
+  fetchedData: Appointment[]
+  selectedAppointment: Appointment | null
+  callLogDialogOpen: boolean
+  newCallLogStatus: string
+  newCallLogNotes: string
+  editingLogId: string | null
+  editedLogStatus: string
+  editedLogNotes: string
+  deleteConfirmOpen: boolean
+  appointmentToDelete: string | null
+  currentPage: number
+  totalPages: number
+  scheduleAnchorEl: HTMLElement | null
+  schedulingAppointment: Appointment | null
+  newScheduledDateTime: Date | null
+  isScheduling: boolean
+}
 
 // API functions
 const updateAppointments = async (id: string, data: Partial<Appointment>) => {
@@ -82,67 +148,6 @@ const deleteAppointment = async (id: string) => {
   }
 }
 
-interface DataTableProps {
-  formFields?: FormField[]
-  data?: Appointment[]
-  onDelete?: (id: string) => void
-  onView?: (row: Appointment) => void
-  userRole: "customercare" | "mediabuyer" | "admin"
-}
-
-interface FormField {
-  key: string
-  label?: string
-}
-
-interface Appointment {
-  id: string
-  _id?: string
-  name: string
-  phone: string
-  branch: string
-  createdAt: string
-  scheduledAt?: string
-  landingPageId: string
-  utmSource?: string
-  doctor?: string
-  offer?: string
-  callLogs?: CallLog[]
-  [key: string]: any
-}
-
-interface CallLog {
-  id?: string
-  timestamp: string
-  status: string
-  notes?: string
-  agentName?: string
-  editedBy?: string
-}
-
-interface State {
-  search: string
-  branchFilter: string
-  loading: boolean
-  error: string | null
-  fetchedData: Appointment[]
-  selectedAppointment: Appointment | null
-  callLogDialogOpen: boolean
-  newCallLogStatus: string
-  newCallLogNotes: string
-  editingLogId: string | null
-  editedLogStatus: string
-  editedLogNotes: string
-  deleteConfirmOpen: boolean
-  appointmentToDelete: string | null
-  currentPage: number
-  totalPages: number
-  scheduleAnchorEl: HTMLElement | null
-  schedulingAppointment: Appointment | null
-  newScheduledDateTime: string
-  isScheduling: boolean
-}
-
 const statusColors: Record<string, "warning" | "info" | "success" | "error" | "default"> = {
   "لم يتم التواصل": "warning",
   استفسار: "info",
@@ -164,6 +169,19 @@ const statusOptions = [
   "لم يتم الرد",
   "طلب التواصل في وقت اخر",
 ]
+
+const defaultFormFields: FormField[] = [
+  { key: "name", label: "الاسم" },
+  { key: "phone", label: "الهاتف" },
+  { key: "branch", label: "الفرع" },
+  { key: "doctor_offer", label: "الطبيب/العرض" },
+  { key: "pageCreator", label: "منشئ الصفحة" },
+  { key: "pageTitle", label: "عنوان الصفحة" },
+  { key: "utmSource", label: "المصدر" },
+  { key: "createdAt", label: "تاريخ الإنشاء" },
+]
+
+const defaultData: Appointment[] = []
 
 const DataTable: React.FC<Partial<DataTableProps>> = ({
   formFields = defaultFormFields,
@@ -189,7 +207,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     totalPages: 1,
     scheduleAnchorEl: null,
     schedulingAppointment: null,
-    newScheduledDateTime: "",
+    newScheduledDateTime: null,
     isScheduling: false,
   })
 
@@ -231,12 +249,75 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     })
   }
 
-  const fetchData = async () => {
+  // Utility functions for datetime handling
+  const formatDateTimeForMySQL = (datetime: Date): string => {
+    if (!datetime) return ""
+
+    const year = datetime.getFullYear()
+    const month = String(datetime.getMonth() + 1).padStart(2, "0")
+    const day = String(datetime.getDate()).padStart(2, "0")
+    const hours = String(datetime.getHours()).padStart(2, "0")
+    const minutes = String(datetime.getMinutes()).padStart(2, "0")
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:00`
+  }
+
+  const formatDateTimeForInput = (mysqlDateTime: string): Date | null => {
+    if (!mysqlDateTime) return null
+
+    try {
+      const [datePart, timePart] = mysqlDateTime.split(" ")
+      if (!datePart || !timePart) return null
+
+      const [year, month, day] = datePart.split("-").map(Number)
+      const [hours, minutes] = timePart.split(":").map(Number)
+
+      return new Date(year, month - 1, day, hours, minutes)
+    } catch (error) {
+      console.error("Error parsing MySQL datetime:", error, mysqlDateTime)
+      return null
+    }
+  }
+
+  const formatDisplayDateTime = (mysqlDateTime: string): string => {
+    if (!mysqlDateTime) return "-"
+
+    try {
+      const [datePart, timePart] = mysqlDateTime.split(" ")
+      if (!datePart || !timePart) return mysqlDateTime
+
+      const [year, month, day] = datePart.split("-").map(Number)
+      const [hours, minutes, seconds = 0] = timePart.split(":").map(Number)
+
+      const date = new Date(year, month - 1, day, hours, minutes, seconds)
+
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date for display:", mysqlDateTime)
+        return mysqlDateTime
+      }
+
+      return date.toLocaleString("ar-EG", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true, // Use 12-hour format with AM/PM in Arabic
+      })
+    } catch (error) {
+      console.error("Error formatting display date:", error, mysqlDateTime)
+      return mysqlDateTime
+    }
+  }
+
+  const fetchData = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }))
     try {
       const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
       if (!response.ok) throw new Error("Network error")
       const data = await response.json()
+console.log(data);
+
       setState((prev) => ({
         ...prev,
         fetchedData: data.appointments || [],
@@ -246,11 +327,11 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     } catch (err) {
       setState((prev) => ({ ...prev, error: "فشل في تحميل البيانات", loading: false }))
     }
-  }
+  }, [currentPage])
 
   useEffect(() => {
     fetchData()
-  }, [currentPage])
+  }, [fetchData])
 
   const branchOptions = useMemo(() => {
     const branches = (fetchedData || []).map((d) => d.branch).filter(Boolean)
@@ -325,11 +406,28 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   }
 
   const openSchedulePopup = (event: React.MouseEvent<HTMLElement>, appointment: Appointment) => {
+    let initialDate = new Date()
+
+    if (appointment.scheduledAt) {
+      const [datePart, timePart] = appointment.scheduledAt.split(" ")
+      if (datePart && timePart) {
+        const [year, month, day] = datePart.split("-")
+        const [hours, minutes] = timePart.split(":")
+        initialDate = new Date(
+          Number.parseInt(year),
+          Number.parseInt(month) - 1,
+          Number.parseInt(day),
+          Number.parseInt(hours),
+          Number.parseInt(minutes),
+        )
+      }
+    }
+
     setState((prev) => ({
       ...prev,
       scheduleAnchorEl: event.currentTarget,
       schedulingAppointment: appointment,
-      newScheduledDateTime: appointment.scheduledAt || new Date().toISOString().slice(0, 16),
+      newScheduledDateTime: initialDate,
     }))
   }
 
@@ -338,44 +436,38 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       ...prev,
       scheduleAnchorEl: null,
       schedulingAppointment: null,
-      newScheduledDateTime: "",
+      newScheduledDateTime: null,
       isScheduling: false,
     }))
   }
 
-  const scheduleAppointment = async () => {
+  const scheduleAppointment = useCallback(async () => {
     if (!schedulingAppointment || !newScheduledDateTime) return
 
     setState((prev) => ({ ...prev, isScheduling: true, error: null }))
 
     try {
-      // Create scheduling log entry
+      const mysqlDateTime = formatDateTimeForMySQL(newScheduledDateTime)
+
       const schedulingLog: CallLog = {
+        id: Math.random().toString(36).slice(2),
         timestamp: new Date().toISOString(),
         status: "تم الحجز",
-        notes: `تم تحديد موعد الحجز: ${new Date(newScheduledDateTime).toLocaleString("ar-EG", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}`,
+        notes: `تم تحديد موعد الحجز: ${formatDisplayDateTime(mysqlDateTime)}`,
         agentName: username || "غير معروف",
       }
 
       const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog]
 
-      // Send update request with proper data structure
-      const result = await updateAppointments(schedulingAppointment.id, {
-        scheduledAt: newScheduledDateTime,
+      await updateAppointments(schedulingAppointment.id, {
+        scheduledAt: mysqlDateTime,
         callLogs: updatedLogs,
       })
 
-      // Refresh data and close popup
       await fetchData()
       closeSchedulePopup()
     } catch (err: any) {
-      console.error("Failed to schedule appointment:", err)
+      console.error("[ERROR] Scheduling failed:", err)
       setState((prev) => ({
         ...prev,
         error: err.message || "فشل في تحديد الموعد",
@@ -383,16 +475,16 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     } finally {
       setState((prev) => ({ ...prev, isScheduling: false }))
     }
-  }
+  }, [schedulingAppointment, newScheduledDateTime, username, fetchData])
 
-  const unscheduleAppointment = async () => {
+  const unscheduleAppointment = useCallback(async () => {
     if (!schedulingAppointment) return
 
     setState((prev) => ({ ...prev, isScheduling: true, error: null }))
 
     try {
-      // Create unscheduling log entry
       const unschedulingLog: CallLog = {
+        id: Math.random().toString(36).slice(2),
         timestamp: new Date().toISOString(),
         status: "تم إلغاء الحجز",
         notes: "تم إلغاء موعد الحجز",
@@ -401,16 +493,14 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
 
       const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog]
 
-      // Send update request to remove scheduled date and add log
       await updateAppointments(schedulingAppointment.id, {
-        scheduledAt: undefined,
+        scheduledAt: null,
         callLogs: updatedLogs,
       })
 
       await fetchData()
       closeSchedulePopup()
     } catch (err: any) {
-      console.error("Failed to unschedule appointment:", err)
       setState((prev) => ({
         ...prev,
         error: err.message || "فشل في إلغاء الموعد",
@@ -418,9 +508,9 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     } finally {
       setState((prev) => ({ ...prev, isScheduling: false }))
     }
-  }
+  }, [schedulingAppointment, username, fetchData])
 
-  const addNewCallLog = async () => {
+  const addNewCallLog = useCallback(async () => {
     if (!selectedAppointment || !newCallLogStatus || !statusOptions.includes(newCallLogStatus)) return
 
     try {
@@ -434,7 +524,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const updatedLogs = [...(selectedAppointment.callLogs || []), newLog]
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs })
 
-      await fetchData() // Refresh data after update
+      await fetchData()
 
       setState((prev) => ({
         ...prev,
@@ -443,9 +533,12 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       }))
     } catch (err) {
       console.error("Failed to add call log:", err)
-      setState((prev) => ({ ...prev, error: "فشل في إضافة سجل الاتصال" }))
+      setState((prev) => ({
+        ...prev,
+        error: "فشل في إضافة سجل الاتصال",
+      }))
     }
-  }
+  }, [selectedAppointment, newCallLogStatus, newCallLogNotes, username, fetchData])
 
   const startEditingLog = (log: CallLog) => {
     setState((prev) => ({
@@ -483,7 +576,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
 
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs })
 
-      await fetchData() // Refresh data after update
+      await fetchData()
 
       setState((prev) => ({
         ...prev,
@@ -493,7 +586,10 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       }))
     } catch (err) {
       console.error("Failed to save edited call log:", err)
-      setState((prev) => ({ ...prev, error: "فشل في حفظ التعديلات" }))
+      setState((prev) => ({
+        ...prev,
+        error: "فشل في حفظ التعديلات",
+      }))
     }
   }
 
@@ -504,7 +600,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const updatedLogs = (selectedAppointment.callLogs || []).filter((log) => log.id !== logId)
       await updateAppointments(selectedAppointment.id, { callLogs: updatedLogs })
 
-      await fetchData() // Refresh data after update
+      await fetchData()
     } catch (err) {
       console.error("Failed to delete call log:", err)
       setState((prev) => ({
@@ -535,7 +631,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
 
     try {
       await deleteAppointment(appointmentToDelete)
-      await fetchData() // Refresh data after deletion
+      await fetchData()
       closeDeleteConfirm()
     } catch (err) {
       console.error("Failed to delete appointment:", err)
@@ -556,22 +652,67 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     </Box>
   )
 
-  const renderScheduledAt = (scheduledAt: string | undefined) => {
+  const renderScheduledAt = (scheduledAt: string | null | undefined) => {
     if (!scheduledAt) return "-"
-    return new Date(scheduledAt).toLocaleString("ar-EG", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    return formatDisplayDateTime(scheduledAt)
   }
 
   const isScheduleOpen = Boolean(scheduleAnchorEl)
   const scheduleId = isScheduleOpen ? "schedule-popover" : undefined
 
+  const handleScheduleClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!isScheduling && newScheduledDateTime) {
+        scheduleAppointment()
+      }
+    },
+    [isScheduling, newScheduledDateTime, scheduleAppointment],
+  )
+
+  const handleUnscheduleClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!isScheduling) {
+        unscheduleAppointment()
+      }
+    },
+    [isScheduling, unscheduleAppointment],
+  )
+
+  const handlePaginationClick = useCallback(
+    (direction: "prev" | "next") => (event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setState((prev) => ({
+        ...prev,
+        currentPage: direction === "prev" ? prev.currentPage - 1 : prev.currentPage + 1,
+      }))
+    },
+    [setState],
+  )
+
+  const handleAddCallLogClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (newCallLogStatus) {
+        addNewCallLog()
+      }
+    },
+    [newCallLogStatus, addNewCallLog],
+  )
+
   return (
     <>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setState((prev) => ({ ...prev, error: null }))}>
+          {error}
+        </Alert>
+      )}
+
       <Box sx={{ mb: 2, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <TextField label="بحث" value={search} onChange={handleChange("search")} sx={{ minWidth: 200 }} />
         <TextField
@@ -610,13 +751,6 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               <TableRow>
                 <TableCell colSpan={visibleFormFields.length + 4} align="center">
                   ... جاري التحميل
-                </TableCell>
-              </TableRow>
-            )}
-            {error && (
-              <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 4} align="center" sx={{ color: "red" }}>
-                  {error}
                 </TableCell>
               </TableRow>
             )}
@@ -722,7 +856,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
           horizontal: "left",
         }}
       >
-        <Box sx={{ p: 2, minWidth: 300 }}>
+        <Box sx={{ p: 2, minWidth: 350 }}>
           <Typography variant="h6" gutterBottom>
             تحديد موعد الحجز
           </Typography>
@@ -730,19 +864,28 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
             {schedulingAppointment?.name} - {schedulingAppointment?.phone}
           </Typography>
 
-          <TextField
-            type="datetime-local"
-            label="تاريخ ووقت الموعد"
-            value={newScheduledDateTime}
-            onChange={(e) => setState((prev) => ({ ...prev, newScheduledDateTime: e.target.value }))}
-            fullWidth
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ar}>
+            <DateTimePicker
+              label="تاريخ ووقت الموعد"
+              value={newScheduledDateTime}
+              onChange={(newValue) => {
+                setState((prev) => ({ ...prev, newScheduledDateTime: newValue }))
+              }}
+              ampm={true}
+              format="dd/MM/yyyy hh:mm a"
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  margin: "normal",
+                  dir: "rtl",
+                },
+              }}
+            />
+          </LocalizationProvider>
 
           <Box sx={{ mt: 2, display: "flex", gap: 1, justifyContent: "space-between" }}>
             {schedulingAppointment?.scheduledAt && (
-              <Button variant="outlined" color="error" onClick={unscheduleAppointment} disabled={isScheduling}>
+              <Button variant="outlined" color="error" onClick={handleUnscheduleClick} disabled={isScheduling}>
                 إلغاء الموعد
               </Button>
             )}
@@ -752,7 +895,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               </Button>
               <Button
                 variant="contained"
-                onClick={scheduleAppointment}
+                onClick={handleScheduleClick}
                 disabled={isScheduling || !newScheduledDateTime}
               >
                 {isScheduling ? "جاري الحفظ..." : "حفظ الموعد"}
@@ -764,12 +907,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
 
       {/* Pagination Controls */}
       <Box sx={{ mt: 2, display: "flex", justifyContent: "center", gap: 1 }}>
-        <Button
-          variant="outlined"
-          disabled={currentPage === 1}
-          onClick={() => setState((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-          size="small"
-        >
+        <Button variant="outlined" disabled={currentPage === 1} onClick={handlePaginationClick("prev")} size="small">
           الصفحة السابقة
         </Button>
         <Typography variant="body2" sx={{ alignSelf: "center" }}>
@@ -778,7 +916,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
         <Button
           variant="outlined"
           disabled={currentPage === totalPages}
-          onClick={() => setState((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }))}
+          onClick={handlePaginationClick("next")}
           size="small"
         >
           الصفحة التالية
@@ -801,14 +939,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               )}
               {selectedAppointment?.scheduledAt && (
                 <Typography variant="body2" color="primary">
-                  موعد الحجز:{" "}
-                  {new Date(selectedAppointment.scheduledAt).toLocaleString("ar-EG", {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  موعد الحجز: {formatDisplayDateTime(selectedAppointment.scheduledAt)}
                 </Typography>
               )}
             </Box>
@@ -886,12 +1017,12 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                           <br />
                           <Typography component="span" variant="caption" color="text.secondary">
                             {new Date(log.timestamp).toLocaleString("ar-EG", {
-                              timeZone: "UTC",
                               year: "numeric",
                               month: "2-digit",
                               day: "2-digit",
                               hour: "2-digit",
                               minute: "2-digit",
+                              hour12: true, // Use 12-hour format with AM/PM in Arabic
                             })}{" "}
                             - الوكيل: {log.agentName || "غير معروف"}
                           </Typography>
@@ -961,7 +1092,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                 variant="contained"
                 startIcon={<AddIcon />}
                 sx={{ mt: 1 }}
-                onClick={addNewCallLog}
+                onClick={handleAddCallLogClick}
                 disabled={!newCallLogStatus}
                 size="small"
               >
@@ -995,18 +1126,5 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     </>
   )
 }
-
-const defaultFormFields: FormField[] = [
-  { key: "name", label: "الاسم" },
-  { key: "phone", label: "الهاتف" },
-  { key: "branch", label: "الفرع" },
-  { key: "doctor_offer", label: "الطبيب/العرض" },
-  { key: "pageCreator", label: "منشئ الصفحة" },
-  { key: "pageTitle", label: "عنوان الصفحة" },
-  { key: "utmSource", label: "المصدر" },
-  { key: "createdAt", label: "تاريخ الإنشاء" },
-]
-
-const defaultData: Appointment[] = []
 
 export default DataTable
