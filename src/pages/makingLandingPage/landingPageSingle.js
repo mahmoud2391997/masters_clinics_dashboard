@@ -79,13 +79,13 @@ const LandingPageEditor = () => {
                 formData.append('landingImage', localContent.landingScreen.image);
             }
             // Handle offer images
-            localContent.offers.forEach((offer, index) => {
+            localContent.offers.forEach((offer) => {
                 if (offer.image instanceof File) {
                     formData.append('offerImages', offer.image);
                 }
             });
             // Handle doctor images
-            localContent.doctors.forEach((doctor, index) => {
+            localContent.doctors.forEach((doctor) => {
                 if (doctor.image instanceof File) {
                     formData.append('doctorImages', doctor.image);
                 }

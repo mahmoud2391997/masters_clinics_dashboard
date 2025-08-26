@@ -1,7 +1,7 @@
 "use client";
 import { jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Box, TextField, MenuItem, TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Typography, IconButton, ListItemSecondaryAction, Chip, Tooltip, Alert, Popover, Avatar, Badge, Switch, FormControlLabel, } from "@mui/material";
+import { Box, TextField, MenuItem, TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, Typography, IconButton, ListItemSecondaryAction, Chip, Tooltip, Alert, Popover, Badge, } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
@@ -140,22 +140,6 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
         const hours = String(datetime.getHours()).padStart(2, "0");
         const minutes = String(datetime.getMinutes()).padStart(2, "0");
         return `${year}-${month}-${day} ${hours}:${minutes}:00`;
-    };
-    const formatDateTimeForInput = (mysqlDateTime) => {
-        if (!mysqlDateTime)
-            return null;
-        try {
-            const [datePart, timePart] = mysqlDateTime.split(" ");
-            if (!datePart || !timePart)
-                return null;
-            const [year, month, day] = datePart.split("-").map(Number);
-            const [hours, minutes] = timePart.split(":").map(Number);
-            return new Date(year, month - 1, day, hours, minutes);
-        }
-        catch (error) {
-            console.error("Error parsing MySQL datetime:", error, mysqlDateTime);
-            return null;
-        }
     };
     const formatDisplayDateTime = (mysqlDateTime) => {
         if (!mysqlDateTime)
@@ -480,21 +464,6 @@ const DataTable = ({ formFields = defaultFormFields, data = defaultData, userRol
                 error: "فشل في حذف الموعد",
                 deleteConfirmOpen: false,
                 appointmentToDelete: null,
-            }));
-        }
-    };
-    const toggleAuthStatus = async (appointment) => {
-        try {
-            await updateAppointments(appointment.id, {
-                is_authed: appointment.is_authed === 1 ? 0 : 1
-            });
-            await fetchData();
-        }
-        catch (err) {
-            console.error("Failed to toggle auth status:", err);
-            setState((prev) => ({
-                ...prev,
-                error: "فشل في تغيير حالة التوثيق",
             }));
         }
     };

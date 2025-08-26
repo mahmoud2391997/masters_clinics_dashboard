@@ -658,20 +658,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     }
   }
 
-  const toggleAuthStatus = async (appointment: Appointment) => {
-    try {
-      await updateAppointments(appointment.id, {
-        is_authed: appointment.is_authed === 1 ? 0 : 1
-      })
-      await fetchData()
-    } catch (err) {
-      console.error("Failed to toggle auth status:", err)
-      setState((prev) => ({
-        ...prev,
-        error: "فشل في تغيير حالة التوثيق",
-      }))
-    }
-  }
+
 
   const renderDoctorOffer = (row: Appointment) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
