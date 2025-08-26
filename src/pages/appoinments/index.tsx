@@ -29,10 +29,8 @@ import {
   Tooltip,
   Alert,
   Popover,
-  Avatar,
   Badge,
-  Switch,
-  FormControlLabel,
+
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import CloseIcon from "@mui/icons-material/Close"
@@ -291,22 +289,6 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     return `${year}-${month}-${day} ${hours}:${minutes}:00`
   }
 
-  const formatDateTimeForInput = (mysqlDateTime: string): Date | null => {
-    if (!mysqlDateTime) return null
-
-    try {
-      const [datePart, timePart] = mysqlDateTime.split(" ")
-      if (!datePart || !timePart) return null
-
-      const [year, month, day] = datePart.split("-").map(Number)
-      const [hours, minutes] = timePart.split(":").map(Number)
-
-      return new Date(year, month - 1, day, hours, minutes)
-    } catch (error) {
-      console.error("Error parsing MySQL datetime:", error, mysqlDateTime)
-      return null
-    }
-  }
 
   const formatDisplayDateTime = (mysqlDateTime: string): string => {
     if (!mysqlDateTime) return "-"
@@ -753,7 +735,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   )
 
   return (
-    <>
+    <div className="p-2">
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setState((prev) => ({ ...prev, error: null }))}>
           {error}
@@ -858,6 +840,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                       color={paymentStatusColors[row.payment_status] || "default"}
                       size="small"
                       icon={row.payment_status === "paid" ? <PaidIcon /> : undefined}
+
                     />
                   </TableCell>
                   <TableCell>
@@ -870,20 +853,20 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                           <VerifiedUserIcon color={row.is_authed === 1 ? "success" : "disabled"} />
                         </Badge>
                       </Tooltip>
-                      {(role === "admin" || role === "mediabuyer") && (
+                      {/* {(role === "admin" || role === "mediabuyer") && (
                         <Switch
                           checked={row.is_authed === 1}
                           onChange={() => toggleAuthStatus(row)}
                           size="small"
                           sx={{ ml: 1 }}
                         />
-                      )}
+                      )} */}
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <span>{renderScheduledAt(row.scheduledAt)}</span>
-                      {(role === "customercare" || role === "admin") && (
+                      {(role !== "mediabuyer" && row.is_authed === 1) && (
                         <IconButton
                           size="small"
                           onClick={(e) => openSchedulePopup(e, row)}
@@ -1235,7 +1218,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </div>
   )
 }
 

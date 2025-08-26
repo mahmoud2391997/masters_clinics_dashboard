@@ -82,7 +82,7 @@ export declare const fetchLandingPageById: import("@reduxjs/toolkit").AsyncThunk
 }>;
 export declare const updateLandingPage: import("@reduxjs/toolkit").AsyncThunk<any, {
     id: string;
-    data: any;
+    data: FormData;
 }, {
     state?: unknown;
     dispatch?: import("redux-thunk").ThunkDispatch<unknown, unknown, import("redux").UnknownAction>;

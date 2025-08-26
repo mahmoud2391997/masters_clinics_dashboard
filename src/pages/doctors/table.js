@@ -32,9 +32,6 @@ const DoctorTable = () => {
             const resp = await axios.get('https://www.ss.mastersclinics.com/doctors', {
                 headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
             });
-
-            console.log(resp.data);
-            
             setDoctors(resp.data);
             setFilteredDoctors(resp.data);
         }
