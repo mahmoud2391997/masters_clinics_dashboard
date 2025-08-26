@@ -1,6 +1,6 @@
 "use client";
 
-import {  MenuItem, TextField, Button, CircularProgress, IconButton } from "@mui/material";
+import { MenuItem, TextField, Button, CircularProgress, IconButton, FormControlLabel, Checkbox } from "@mui/material";
 import { Add, Delete } from "@mui/icons-material";
 import React, { useState } from "react";
 import { toast } from 'react-toastify';
@@ -19,10 +19,23 @@ interface Appointment {
   phone: string;
   branch: string;
   createdAt: string;
-  landingPageId: string;
+  landingPageId: string | null;
   utmSource: string;
+  doctor: string | null;
+  offer: string | null;
+  device: string | null;
+  scheduledAt: string | null;
+  type: string | null;
+  clientId: number | null;
+  bookingId: string | null;
+  is_authed: number;
+  payment_session_id: string | null;
+  payment_status: string;
+  paid_at: string | null;
+  stripe_payment_intent_id: string | null;
+  pageCreator: string | null;
+  pageTitle: string | null;
   callLogs?: CallLog[];
-  [key: string]: any;
 }
 
 type FormFields = Omit<Appointment, 'id' | 'createdAt' | 'callLogs'> & {
@@ -35,7 +48,25 @@ const initialFormState: FormFields = {
   branch: "",
   landingPageId: "",
   utmSource: "",
-  callLogs: [],
+  doctor: null,
+  offer: null,
+  device: null,
+  scheduledAt: null,
+  type: null,
+  clientId: null,
+  bookingId: null,
+  is_authed: 0,
+  payment_session_id: null,
+  payment_status: "unpaid",
+  paid_at: null,
+  stripe_payment_intent_id: null,
+  pageCreator: null,
+  pageTitle: null,
+  callLogs: [{ 
+    timestamp: new Date().toISOString().slice(0, 16),
+    status: "لم يتم التواصل",
+    notes: "" 
+  }]
 };
 
 type LeadFormProps = {
@@ -43,14 +74,7 @@ type LeadFormProps = {
 };
 
 export default function LeadForm({ setAddLead }: LeadFormProps) {
-  const [form, setForm] = useState<FormFields>({ 
-    ...initialFormState,
-    callLogs: [{ 
-      timestamp: new Date().toISOString().slice(0, 16),
-      status: "لم يتم التواصل",
-      notes: "" 
-    }]
-  });
+  const [form, setForm] = useState<FormFields>(initialFormState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,10 +93,17 @@ export default function LeadForm({ setAddLead }: LeadFormProps) {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target as HTMLInputElement;
+    
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm((prev) => ({ ...prev, [name]: checked ? 1 : 0 }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
+    
     setError(null);
   };
 
@@ -137,14 +168,7 @@ export default function LeadForm({ setAddLead }: LeadFormProps) {
       if (!res.ok) throw new Error("فشل إرسال البيانات");
 
       toast.success("تمت إضافة الرسالة بنجاح");
-      setForm({ 
-        ...initialFormState,
-        callLogs: [{ 
-          timestamp: new Date().toISOString().slice(0, 16),
-          status: "لم يتم التواصل",
-          notes: "" 
-        }]
-      });
+      setForm(initialFormState);
       setAddLead(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "حدث خطأ أثناء الإرسال";
@@ -156,8 +180,8 @@ export default function LeadForm({ setAddLead }: LeadFormProps) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4 bg-white shadow rounded-lg" dir="rtl">
-      <h2 className="text-xl font-bold mb-4">إضافة رائد</h2>
+    <div className="max-w-4xl mx-auto p-4 bg-white shadow rounded-lg" dir="rtl">
+      <h2 className="text-xl font-bold mb-4">إضافة عميل محتمل</h2>
 
       {error && (
         <div className="bg-red-100 text-red-700 p-3 mb-4 rounded">
@@ -166,37 +190,188 @@ export default function LeadForm({ setAddLead }: LeadFormProps) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <TextField
-          label="الاسم"
-          name="name"
-          value={form.name}
-          onChange={handleChange}
-          required
-          fullWidth
-          error={!!error && !form.name.trim()}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="الاسم"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            fullWidth
+            error={!!error && !form.name.trim()}
+          />
 
-        <TextField
-          label="رقم الهاتف"
-          name="phone"
-          value={form.phone}
-          onChange={handleChange}
-          required
-          fullWidth
-          type="tel"
-          error={!!error && (!form.phone.trim() || !/^[0-9]{10,15}$/.test(form.phone))}
-          helperText="يجب أن يحتوي على 10-15 رقم"
-        />
+          <TextField
+            label="رقم الهاتف"
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            required
+            fullWidth
+            type="tel"
+            error={!!error && (!form.phone.trim() || !/^[0-9]{10,15}$/.test(form.phone))}
+            helperText="يجب أن يحتوي على 10-15 رقم"
+          />
+        </div>
 
-        <TextField
-          label="الفرع"
-          name="branch"
-          value={form.branch}
-          onChange={handleChange}
-          required
-          fullWidth
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="الفرع"
+            name="branch"
+            value={form.branch}
+            onChange={handleChange}
+            required
+            fullWidth
+          />
 
+          <TextField
+            label="نوع الحجز"
+            name="type"
+            value={form.type || ""}
+            onChange={handleChange}
+            select
+            fullWidth
+          >
+            <MenuItem value="">اختر نوع الحجز</MenuItem>
+            <MenuItem value="doctor">طبيب</MenuItem>
+            <MenuItem value="offer">عرض</MenuItem>
+            <MenuItem value="device">جهاز</MenuItem>
+            <MenuItem value="branch">فرع</MenuItem>
+          </TextField>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="الطبيب"
+            name="doctor"
+            value={form.doctor || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+
+          <TextField
+            label="العرض"
+            name="offer"
+            value={form.offer || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="الجهاز"
+            name="device"
+            value={form.device || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+
+          <TextField
+            label="وقت الحجز"
+            name="scheduledAt"
+            type="datetime-local"
+            value={form.scheduledAt || ""}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="معرف الصفحة المقصودة"
+            name="landingPageId"
+            value={form.landingPageId || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+
+          <TextField
+            label="مصدر UTM"
+            name="utmSource"
+            value={form.utmSource}
+            onChange={handleChange}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="منشئ الصفحة"
+            name="pageCreator"
+            value={form.pageCreator || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+
+          <TextField
+            label="عنوان الصفحة"
+            name="pageTitle"
+            value={form.pageTitle || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="حالة الدفع"
+            name="payment_status"
+            value={form.payment_status}
+            onChange={handleChange}
+            select
+            fullWidth
+          >
+            <MenuItem value="unpaid">غير مدفوع</MenuItem>
+            <MenuItem value="pending">قيد الانتظار</MenuItem>
+            <MenuItem value="paid">مدفوع</MenuItem>
+          </TextField>
+
+          <TextField
+            label="معرف جلسة الدفع"
+            name="payment_session_id"
+            value={form.payment_session_id || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TextField
+            label="معرف نية الدفع"
+            name="stripe_payment_intent_id"
+            value={form.stripe_payment_intent_id || ""}
+            onChange={handleChange}
+            fullWidth
+          />
+
+          <TextField
+            label="وقت الدفع"
+            name="paid_at"
+            type="datetime-local"
+            value={form.paid_at || ""}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.is_authed === 1}
+                onChange={(e) => setForm(prev => ({ 
+                  ...prev, 
+                  is_authed: e.target.checked ? 1 : 0 
+                }))}
+                name="is_authed"
+              />
+            }
+            label="مستخدم موثوق"
+          />
+        </div>
 
         <div className="border p-4 rounded-lg">
           <div className="flex justify-between items-center mb-4">

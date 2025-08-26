@@ -29,12 +29,18 @@ import {
   Tooltip,
   Alert,
   Popover,
+  Avatar,
+  Badge,
+  Switch,
+  FormControlLabel,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import CloseIcon from "@mui/icons-material/Close"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import ScheduleIcon from "@mui/icons-material/Schedule"
+import PaidIcon from "@mui/icons-material/Paid"
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser"
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker"
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns"
@@ -67,6 +73,17 @@ interface Appointment {
   utmSource?: string
   doctor?: string
   offer?: string
+  device?: string
+  type?: string
+  clientId?: number | null
+  bookingId?: string | null
+  is_authed: number
+  payment_session_id?: string | null
+  payment_status: string
+  paid_at?: string | null
+  stripe_payment_intent_id?: string | null
+  pageCreator?: string | null
+  pageTitle?: string | null
   callLogs?: CallLog[]
   [key: string]: any
 }
@@ -82,6 +99,8 @@ interface DataTableProps {
 interface State {
   search: string
   branchFilter: string
+  paymentFilter: string
+  authFilter: string
   loading: boolean
   error: string | null
   fetchedData: Appointment[]
@@ -159,6 +178,12 @@ const statusColors: Record<string, "warning" | "info" | "success" | "error" | "d
   "طلب التواصل في وقت اخر": "info",
 }
 
+const paymentStatusColors: Record<string, "success" | "warning" | "error" | "default"> = {
+  paid: "success",
+  pending: "warning",
+  unpaid: "error",
+}
+
 const statusOptions = [
   "لم يتم التواصل",
   "استفسار",
@@ -191,6 +216,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   const [state, setState] = useState<State>({
     search: "",
     branchFilter: "all",
+    paymentFilter: "all",
+    authFilter: "all",
     loading: false,
     error: null,
     fetchedData: data,
@@ -214,6 +241,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   const {
     search,
     branchFilter,
+    paymentFilter,
+    authFilter,
     loading,
     error,
     fetchedData,
@@ -302,7 +331,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true, // Use 12-hour format with AM/PM in Arabic
+        hour12: true,
       })
     } catch (error) {
       console.error("Error formatting display date:", error, mysqlDateTime)
@@ -316,7 +345,6 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
       if (!response.ok) throw new Error("Network error")
       const data = await response.json()
-console.log(data);
 
       setState((prev) => ({
         ...prev,
@@ -373,11 +401,15 @@ console.log(data);
     return fetchedData
       .filter((row) => {
         const matchesBranch = branchFilter === "all" || row.branch === branchFilter
+        const matchesPayment = paymentFilter === "all" || row.payment_status === paymentFilter
+        const matchesAuth = authFilter === "all" || 
+          (authFilter === "authed" && row.is_authed === 1) || 
+          (authFilter === "notAuthed" && row.is_authed === 0)
         const matchesSearch = search.trim() ? deepSearch(row, search) : true
-        return matchesBranch && matchesSearch
+        return matchesBranch && matchesPayment && matchesAuth && matchesSearch
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [search, branchFilter, fetchedData])
+  }, [search, branchFilter, paymentFilter, authFilter, fetchedData])
 
   const handleChange = (field: keyof State) => (e: ChangeEvent<HTMLInputElement>) => {
     setState((prev) => ({ ...prev, [field]: e.target.value }))
@@ -644,6 +676,21 @@ console.log(data);
     }
   }
 
+  const toggleAuthStatus = async (appointment: Appointment) => {
+    try {
+      await updateAppointments(appointment.id, {
+        is_authed: appointment.is_authed === 1 ? 0 : 1
+      })
+      await fetchData()
+    } catch (err) {
+      console.error("Failed to toggle auth status:", err)
+      setState((prev) => ({
+        ...prev,
+        error: "فشل في تغيير حالة التوثيق",
+      }))
+    }
+  }
+
   const renderDoctorOffer = (row: Appointment) => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
       {row.doctor && <Typography variant="body2">الطبيب: {row.doctor}</Typography>}
@@ -729,6 +776,29 @@ console.log(data);
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          select
+          label="حالة الدفع"
+          value={paymentFilter}
+          onChange={handleChange("paymentFilter")}
+          sx={{ minWidth: 150 }}
+        >
+          <MenuItem value="all">الكل</MenuItem>
+          <MenuItem value="paid">مدفوع</MenuItem>
+          <MenuItem value="pending">قيد الانتظار</MenuItem>
+          <MenuItem value="unpaid">غير مدفوع</MenuItem>
+        </TextField>
+        <TextField
+          select
+          label="حالة التوثيق"
+          value={authFilter}
+          onChange={handleChange("authFilter")}
+          sx={{ minWidth: 150 }}
+        >
+          <MenuItem value="all">الكل</MenuItem>
+          <MenuItem value="authed">موثوق</MenuItem>
+          <MenuItem value="notAuthed">غير موثوق</MenuItem>
+        </TextField>
       </Box>
 
       <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
@@ -740,6 +810,8 @@ console.log(data);
                   {field.label}
                 </TableCell>
               ))}
+              <TableCell>حالة الدفع</TableCell>
+              <TableCell>حالة التوثيق</TableCell>
               <TableCell>موعد الحجز</TableCell>
               <TableCell>آخر حالة</TableCell>
               <TableCell>سجلات الاتصال</TableCell>
@@ -749,14 +821,14 @@ console.log(data);
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 4} align="center">
+                <TableCell colSpan={visibleFormFields.length + 6} align="center">
                   ... جاري التحميل
                 </TableCell>
               </TableRow>
             )}
             {!loading && filteredData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={visibleFormFields.length + 4} align="center">
+                <TableCell colSpan={visibleFormFields.length + 6} align="center">
                   لا توجد بيانات
                 </TableCell>
               </TableRow>
@@ -780,6 +852,34 @@ console.log(data);
                           : (row[field.key] ?? "-")}
                     </TableCell>
                   ))}
+                  <TableCell>
+                    <Chip
+                      label={row.payment_status === "paid" ? "مدفوع" : row.payment_status === "pending" ? "قيد الانتظار" : "غير مدفوع"}
+                      color={paymentStatusColors[row.payment_status] || "default"}
+                      size="small"
+                      icon={row.payment_status === "paid" ? <PaidIcon /> : undefined}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Tooltip title={row.is_authed === 1 ? "موثوق" : "غير موثوق"}>
+                        <Badge
+                          color={row.is_authed === 1 ? "success" : "error"}
+                          badgeContent={row.is_authed === 1 ? "✓" : "✗"}
+                        >
+                          <VerifiedUserIcon color={row.is_authed === 1 ? "success" : "disabled"} />
+                        </Badge>
+                      </Tooltip>
+                      {(role === "admin" || role === "mediabuyer") && (
+                        <Switch
+                          checked={row.is_authed === 1}
+                          onChange={() => toggleAuthStatus(row)}
+                          size="small"
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <span>{renderScheduledAt(row.scheduledAt)}</span>
@@ -942,6 +1042,18 @@ console.log(data);
                   موعد الحجز: {formatDisplayDateTime(selectedAppointment.scheduledAt)}
                 </Typography>
               )}
+              <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                <Chip
+                  label={selectedAppointment?.payment_status === "paid" ? "مدفوع" : selectedAppointment?.payment_status === "pending" ? "قيد الانتظار" : "غير مدفوع"}
+                  color={paymentStatusColors[selectedAppointment?.payment_status || "unpaid"] || "default"}
+                  size="small"
+                />
+                <Chip
+                  label={selectedAppointment?.is_authed === 1 ? "موثوق" : "غير موثوق"}
+                  color={selectedAppointment?.is_authed === 1 ? "success" : "error"}
+                  size="small"
+                />
+              </Box>
             </Box>
           </Box>
           <IconButton aria-label="close" onClick={closeCallLogDialog} sx={{ position: "absolute", left: 8, top: 8 }}>
@@ -1022,7 +1134,7 @@ console.log(data);
                               day: "2-digit",
                               hour: "2-digit",
                               minute: "2-digit",
-                              hour12: true, // Use 12-hour format with AM/PM in Arabic
+                              hour12: true,
                             })}{" "}
                             - الوكيل: {log.agentName || "غير معروف"}
                           </Typography>
@@ -1127,4 +1239,4 @@ console.log(data);
   )
 }
 
-export default DataTable
+export default DataTable;
