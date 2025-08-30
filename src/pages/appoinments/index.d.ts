@@ -23,17 +23,9 @@ interface Appointment {
     utmSource?: string;
     doctor?: string;
     offer?: string;
-    device?: string;
-    type?: string;
-    clientId?: number | null;
-    bookingId?: string | null;
     is_authed: number;
-    payment_session_id?: string | null;
     payment_status: string;
-    paid_at?: string | null;
-    stripe_payment_intent_id?: string | null;
-    pageCreator?: string | null;
-    pageTitle?: string | null;
+    status: string;
     callLogs?: CallLog[];
     [key: string]: any;
 }
