@@ -1,4 +1,3 @@
-
 "use client"
 import type React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
@@ -1086,7 +1085,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
         </DialogTitle>
         <DialogContent dividers>
           <List dense>
-            {(selectedAppointment?.callLogs || []).map((log) => (
+            {/* Reverse the call logs array to show latest first */}
+            {(selectedAppointment?.callLogs || []).slice().reverse().map((log) => (
               <ListItem key={log.id} alignItems="flex-start" divider>
                 {editingLogId === log.id ? (
                   <Box sx={{ width: "100%" }}>
