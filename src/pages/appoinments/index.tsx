@@ -70,6 +70,8 @@ interface Appointment {
   utmSource?: string
   doctor?: string
   offer?: string
+  device?: string
+  type?: string
   is_authed: number
   payment_status: string
   status: string
@@ -157,7 +159,7 @@ const defaultFormFields: FormField[] = [
   { key: "name", label: "الاسم" },
   { key: "phone", label: "الهاتف" },
   { key: "branch", label: "الفرع" },
-  { key: "doctor_offer", label: "الطبيب/العرض" },
+  { key: "doctor_offer", label: "الخدمة" },
   { key: "pageCreator", label: "منشئ الصفحة" },
   { key: "pageTitle", label: "عنوان الصفحة" },
   { key: "utmSource", label: "المصدر" },
@@ -301,8 +303,6 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
       if (!response.ok) throw new Error("Network error")
       const data = await response.json();
-    console.log(data);
-    
       setState((prev) => ({
         ...prev,
         fetchedData: data.appointments || [],
@@ -546,10 +546,30 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   }
 
   const renderDoctorOffer = (row: Appointment) => (
-    <div className="flex flex-col gap-1">
-      {row.doctor && <div className="text-sm">الطبيب: {row.doctor}</div>}
-      {row.offer && <div className="text-sm">العرض: {row.offer}</div>}
-      {!row.doctor && !row.offer && "-"}
+    <div className="flex flex-col gap-1 text-sm">
+      {row.type === "device" && row.device && (
+        <div className="font-medium text-green-700">جهاز: {row.device}</div>
+      )}
+      {row.type === "doctor" && row.doctor && (
+        <div className="font-medium text-blue-700">طبيب: {row.doctor}</div>
+      )}
+      {row.type === "offer" && row.offer && (
+        <div className="font-medium text-purple-700">عرض: {row.offer}</div>
+      )}
+      {row.type === "branch" && (
+        <div className="font-medium text-gray-700">فرع: {row.branch}</div>
+      )}
+      {/* Show additional info for cross-referencing */}
+      {row.type !== "device" && row.device && (
+        <div className="text-xs text-gray-500">جهاز: {row.device}</div>
+      )}
+      {row.type !== "doctor" && row.doctor && (
+        <div className="text-xs text-gray-500">طبيب: {row.doctor}</div>
+      )}
+      {row.type !== "offer" && row.offer && (
+        <div className="text-xs text-gray-500">عرض: {row.offer}</div>
+      )}
+      {!row.device && !row.doctor && !row.offer && "-"}
     </div>
   )
 
@@ -668,7 +688,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                 <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">الحالة</th>
                 <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">موعد الحجز</th>
                 <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">آخر حالة</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">سجلات الاتصال</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-nowrap">سجلات الاتصال</th>
                 <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">إجراءات</th>
               </tr>
             </thead>
@@ -730,14 +750,14 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                       ) : (
                         <Chip
                           label={appointmentStatusLabels[row.status] || row.status}
-                          className={appointmentStatusColors[row.status] || "bg-gray-100 text-gray-800"}
+                          className={appointmentStatusColors[row.status] || "bg-gray-极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-100 text-gray-800"}
                         />
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-text-sm font-medium text-gray-900">
                             {renderScheduledAt(row.scheduledAt)}
                           </div>
                           {row.scheduledAt && (
@@ -868,7 +888,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-700 mb-2">
                   تاريخ ووقت الموعد
                 </label>
                 <input
@@ -882,7 +902,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                 </p>
               </div>
 
-              <div className="flex justify-between items-center gap-3">
+              <div className="flex justify-between items-center gap极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-3">
                 {schedulingAppointment.scheduledAt && (
                   <button
                     onClick={unscheduleAppointment}
@@ -1096,7 +1116,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] flex flex-col mx-auto overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] sm:max极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询--h-[85vh] flex flex-col mx-auto overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center">
           <div>
@@ -1110,7 +1130,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
+            className="p极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询--2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
           >
             <X className="h-5 w-5" />
           </button>
@@ -1197,11 +1217,11 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
             <select
               value={newCallLogStatus}
               onChange={(e) => setNewCallLogStatus(e.target.value)}
-              className="w-full mb-3 border rounded p-2"
+              className="w-full mb-3 border rounded p极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询--2"
             >
               <option value="">اختر الحالة</option>
               {callLogStatusOptions.map((status) => (
-                <option key={status} value={status}>
+                <option key极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-={status} value={status}>
                   {status}
                 </option>
               ))}
@@ -1235,7 +1255,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
       {/* Edit Popup */}
       {editPopupOpen && editingLog && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg">
+          <div className="bg极速赛车开奖直播极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询-历史记录-极速赛车开奖结果-极速赛车开奖官网查询-white p-6 rounded-lg w-full max-w-md shadow-lg">
             <h3 className="text-lg font-semibold mb-4">تعديل السجل</h3>
             <label className="block mb-2 text-sm">الحالة *</label>
             <select

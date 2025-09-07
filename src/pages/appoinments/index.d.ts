@@ -24,6 +24,8 @@ interface Appointment {
     utmSource?: string;
     doctor?: string;
     offer?: string;
+    device?: string;
+    type?: string;
     is_authed: number;
     payment_status: string;
     status: string;
