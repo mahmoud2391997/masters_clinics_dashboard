@@ -11,4 +11,5 @@ export interface Blog {
     create_at?: string;
     date?: string;
     is_active: number;
+    priority: number;
 }

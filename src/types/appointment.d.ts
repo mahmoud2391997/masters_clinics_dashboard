@@ -1,18 +1,13 @@
-import React from "react";
-interface FormField {
-    key: string;
-    label?: string;
-}
-interface CallLog {
+export interface CallLog {
     id?: string;
-    timestamp: string;
+    timestamp_str: string;
     status: string;
     notes?: string;
     agentName?: string;
     editedBy?: string;
-    timezone?: string;
+    timestamp?: string;
 }
-interface Appointment {
+export interface Appointment {
     id: string;
     _id?: string;
     name: string;
@@ -32,12 +27,15 @@ interface Appointment {
     pageTitle?: string;
     [key: string]: any;
 }
-interface DataTableProps {
+export interface FormField {
+    key: string;
+    label?: string;
+}
+export type UserRole = "customercare" | "mediabuyer" | "admin";
+export interface DataTableProps {
     formFields?: FormField[];
     data?: Appointment[];
     onDelete?: (id: string) => void;
     onView?: (row: Appointment) => void;
-    userRole: "customercare" | "mediabuyer" | "admin";
+    userRole: UserRole;
 }
-declare const DataTable: React.FC<Partial<DataTableProps>>;
-export default DataTable;

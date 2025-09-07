@@ -19,7 +19,8 @@ const BlogsPage: React.FC = () => {
     content: "",
     image: "",
     created_at: "",
-    is_active: 1 // Add is_active to form state
+    is_active: 1,
+    priority: 0 // Add priority to form state
   });
 
   useEffect(() => {
@@ -65,6 +66,7 @@ const BlogsPage: React.FC = () => {
       formData.append("author", form.author);
       formData.append("content", form.content || "");
       formData.append("is_active", form.is_active ? "true" : "false");
+      formData.append("priority", form.priority?.toString()); // Add priority
 
       if (form.imageFile) {
         formData.append("image", form.imageFile);
@@ -84,6 +86,7 @@ const BlogsPage: React.FC = () => {
         image: "",
         created_at: "",
         is_active: 1,
+        priority: 0,
         imageFile: undefined,
       });
 
@@ -107,35 +110,59 @@ const BlogsPage: React.FC = () => {
     }
   };
 
-const handleToggleActive = async (id: number, currentStatus: number) => {
-  const newStatus = currentStatus === 1 ? 0 : 1;
-  
-  try {
-    // Optimistically update UI first
-    setBlogs(prevBlogs => 
-      prevBlogs.map(blog => 
-        blog.id === id ? { ...blog, is_active: newStatus } : blog
-      )
-    );
-
-    // Then make API call
-    await axios.put(`https://www.ss.mastersclinics.com/blogs/${id}`, {
-      is_active: newStatus
-    });
-
-    toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المدونة بنجاح`);
-  } catch (error) {
-    console.error("فشل في تغيير حالة المدونة:", error);
-    toast.error("فشل في تغيير حالة المدونة");
+  const handleToggleActive = async (id: number, currentStatus: number) => {
+    const newStatus = currentStatus === 1 ? 0 : 1;
     
-    // Revert state on error
-    setBlogs(prevBlogs => 
-      prevBlogs.map(blog => 
-        blog.id === id ? { ...blog, is_active: currentStatus } : blog
-      )
-    );
-  }
-};
+    try {
+      // Optimistically update UI first
+      setBlogs(prevBlogs => 
+        prevBlogs.map(blog => 
+          blog.id === id ? { ...blog, is_active: newStatus } : blog
+        )
+      );
+
+      // Then make API call
+      await axios.put(`https://www.ss.mastersclinics.com/blogs/${id}`, {
+        is_active: newStatus
+      });
+
+      toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المدونة بنجاح`);
+    } catch (error) {
+      console.error("فشل في تغيير حالة المدونة:", error);
+      toast.error("فشل في تغيير حالة المدونة");
+      
+      // Revert state on error
+      setBlogs(prevBlogs => 
+        prevBlogs.map(blog => 
+          blog.id === id ? { ...blog, is_active: currentStatus } : blog
+        )
+      );
+    }
+  };
+
+  const handlePriorityChange = async (id: number, newPriority: number) => {
+    try {
+      // Optimistically update UI first
+      setBlogs(prevBlogs => 
+        prevBlogs.map(blog => 
+          blog.id === id ? { ...blog, priority: newPriority } : blog
+        )
+      );
+
+      // Then make API call
+      await axios.put(`https://www.ss.mastersclinics.com/blogs/${id}`, {
+        priority: newPriority
+      });
+
+      toast.success("تم تحديث الأولوية بنجاح");
+    } catch (error) {
+      console.error("فشل في تحديث الأولوية:", error);
+      toast.error("فشل في تحديث الأولوية");
+      
+      // Revert state on error
+      fetchBlogs(); // Refetch to ensure consistency
+    }
+  };
 
   const filteredBlogs = blogs.filter((blog) =>
     blog.title2?.toLowerCase().includes(search.toLowerCase())
@@ -236,6 +263,17 @@ const handleToggleActive = async (id: number, currentStatus: number) => {
                   {formErrors.content && <p className="text-red-500 text-xs mt-1">{formErrors.content}</p>}
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
+                  <input
+                    type="number"
+                    value={form.priority}
+                    onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) || 0 })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                    min="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">كلما زاد الرقم زادت الأولوية</p>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ملف الصورة</label>
                   <input
                     type="file"
@@ -305,6 +343,10 @@ const handleToggleActive = async (id: number, currentStatus: number) => {
                       </div>
                     )}
 
+                    <div className="absolute top-2 right-22 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                      الأولوية: {blog.priority || 0}
+                    </div>
+
                     <div className="h-48 overflow-hidden">
                       <img
                         src={getImageUrl(blog.image || "") || "/placeholder.png"}
@@ -316,6 +358,18 @@ const handleToggleActive = async (id: number, currentStatus: number) => {
                       <h3 className="text-xl font-bold text-gray-800 mb-2">{blog.title2}</h3>
                       <p className="text-sm text-gray-600 mb-4">بواسطة {blog.author}</p>
                       <p className="text-gray-700 mb-4 line-clamp-2">{blog.content}</p>
+                      
+                      <div className="flex items-center mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mr-2">تغيير الأولوية:</label>
+                        <input
+                          type="number"
+                          value={blog.priority || 0}
+                          onChange={(e) => handlePriorityChange(blog.id, parseInt(e.target.value) || 0)}
+                          className="w-20 p-1 border border-gray-300 rounded"
+                          min="0"
+                        />
+                      </div>
+                      
                       <div className="flex justify-between items-center">
                         <Link to={`/blogs/${blog.id}`} className="inline-flex items-center text-green-600 hover:text-green-700 font-medium">
                           اقرأ المزيد

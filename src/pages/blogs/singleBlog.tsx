@@ -17,7 +17,8 @@ interface Blog {
   created_at: string;
   updated_at: string;
   comment: number;
-  is_active: number; // Add is_active to the interface
+  is_active: number;
+  priority: number; // Add priority to the interface
 }
 
 const BlogSinglePage: React.FC = () => {
@@ -77,11 +78,19 @@ const BlogSinglePage: React.FC = () => {
     }));
   };
 
+  const handleNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditedBlog(prev => ({
+      ...prev,
+      [name]: parseInt(value) || 0,
+    }));
+  };
+
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setEditedBlog(prev => ({
       ...prev,
-      [name]: checked,
+      [name]: checked ? 1 : 0,
     }));
   };
 
@@ -98,26 +107,26 @@ const BlogSinglePage: React.FC = () => {
     }
   };
 
-const handleToggleActive = async () => {
-  if (!blog) return;
+  const handleToggleActive = async () => {
+    if (!blog) return;
 
-  try {
-    setLoading(true);
-    const newStatus = blog.is_active === 1 ? 0 : 1;
-    
-   await axios.put(`https://www.ss.mastersclinics.com/blogs/${blog.id}`, {
-      is_active: newStatus
-    });
-    
-    setBlog({ ...blog, is_active: newStatus });
-    toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المقال بنجاح`);
-  } catch (error) {
-    console.error("فشل في تغيير حالة المقال:", error);
-    toast.error("فشل في تغيير حالة المقال");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      const newStatus = blog.is_active === 1 ? 0 : 1;
+      
+      await axios.put(`https://www.ss.mastersclinics.com/blogs/${blog.id}`, {
+        is_active: newStatus
+      });
+      
+      setBlog({ ...blog, is_active: newStatus });
+      toast.success(`تم ${newStatus === 1 ? "تفعيل" : "تعطيل"} المقال بنجاح`);
+    } catch (error) {
+      console.error("فشل في تغيير حالة المقال:", error);
+      toast.error("فشل في تغيير حالة المقال");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -134,6 +143,7 @@ const handleToggleActive = async () => {
       if (imageFile) {
         formData.append('image', imageFile);
       }
+console.log(id);
 
       await axios.put(`https://www.ss.mastersclinics.com/blogs/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -214,25 +224,27 @@ const handleToggleActive = async () => {
             />
           </div>
 
-      <div className="form-group">
-  <label>تفعيل المقال:</label>
-  <input
-    type="checkbox"
-    name="is_active"
-    checked={editedBlog.is_active === 1}  // Changed from ?? true to === 1
-    onChange={(e) => {
-      handleCheckboxChange({
-        ...e,
-        target: {
-          ...e.target,
-          name: e.target.name,
-          checked: e.target.checked,
-          value: e.target.checked ? '1' : '0'  // Convert to string if needed
-        }
-      });
-    }}
-    className="active-checkbox"
-  />
+          <div className="form-group">
+            <label>الأولوية:</label>
+            <input
+              type="number"
+              name="priority"
+              value={editedBlog.priority || 0}
+              onChange={handleNumberInputChange}
+              min="0"
+            />
+            <p className="input-hint">كلما زاد الرقم زادت الأولوية</p>
+          </div>
+
+          <div className="form-group">
+            <label>تفعيل المقال:</label>
+            <input
+              type="checkbox"
+              name="is_active"
+              checked={editedBlog.is_active === 1}
+              onChange={handleCheckboxChange}
+              className="active-checkbox"
+            />
           </div>
 
           <div className="form-group">
@@ -289,6 +301,10 @@ const handleToggleActive = async () => {
               <span>معطلة</span>
             </div>
           )}
+
+          <div className="priority-badge">
+            <span>الأولوية: {blog.priority || 0}</span>
+          </div>
 
           <img
             src={currentImage}
