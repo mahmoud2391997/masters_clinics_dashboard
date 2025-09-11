@@ -17,6 +17,7 @@ import LandingPageEditor from "./pages/makingLandingPage/landingPageSingle";
 import BlogsDashboard from "./pages/blogs";
 import BlogSinglePage from "./pages/blogs/singleBlog";
 import TestimonialsDashboard from "./pages/reviews";
+import Inquiries from "./pages/inquiries/index"
 
 function App() {
 
@@ -92,6 +93,7 @@ console.log(role);
                 <Route path="/landingPage/:id" element={<LandingPageEditor />} />
               )}
               <Route path="/doctors" element={<DataTableHeaders />} />
+              <Route path="/inquiries" element={<Inquiries />} />
               <Route path="/testimonials" element={<TestimonialsDashboard />} />
               <Route path="/blogs" element={<BlogsDashboard />} />
               <Route path="/blogs/:id" element={<BlogSinglePage />} />

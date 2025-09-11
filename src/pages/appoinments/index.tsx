@@ -56,6 +56,10 @@ interface CallLog {
   agentName?: string
   editedBy?: string
   timezone?: string
+  support_member_name?: string
+  admin_notes?: string
+  mediabuyer_notes?: string
+  created_by_role?: 'admin' | 'mediabuyer' | 'customercare'
 }
 
 interface Appointment {
@@ -303,6 +307,8 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
       if (!response.ok) throw new Error("Network error")
       const data = await response.json();
+    console.log(data);
+    
       setState((prev) => ({
         ...prev,
         fetchedData: data.appointments || [],
@@ -451,6 +457,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
         notes: `تم تحديد موعد الحجز: ${formatDisplayDateTime(mysqlDateTime)}`,
         agentName: username || "غير معروف",
         timezone: getUserTimezone(),
+        created_by_role: role as any,
       }
       const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog]
       await updateAppointments(schedulingAppointment.id, {
@@ -468,7 +475,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     } finally {
       setState((prev) => ({ ...prev, isScheduling: false }))
     }
-  }, [schedulingAppointment, newScheduledDateTime, username, fetchData])
+  }, [schedulingAppointment, newScheduledDateTime, username, role, fetchData])
 
   const unscheduleAppointment = useCallback(async () => {
     if (!schedulingAppointment) return
@@ -481,6 +488,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
         notes: "تم إلغاء موعد الحجز",
         agentName: username || "غير معروف",
         timezone: getUserTimezone(),
+        created_by_role: role as any,
       }
       const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog]
       await updateAppointments(schedulingAppointment.id, {
@@ -497,7 +505,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     } finally {
       setState((prev) => ({ ...prev, isScheduling: false }))
     }
-  }, [schedulingAppointment, username, fetchData])
+  }, [schedulingAppointment, username, role, fetchData])
 
   const openDeleteConfirm = (appointmentId: string) => {
     setState((prev) => ({
@@ -992,7 +1000,9 @@ interface CallLogManagerProps {
   userRole: "customercare" | "mediabuyer" | "admin";
   username: string;
 }
+// ... (previous code remains the same)
 
+// CallLogManager component with proper role-based field visibility
 const CallLogManager: React.FC<CallLogManagerProps> = ({
   open,
   onClose,
@@ -1016,13 +1026,22 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
   // Add form state
   const [newCallLogStatus, setNewCallLogStatus] = useState("");
   const [newCallLogNotes, setNewCallLogNotes] = useState("");
+  const [newSupportMemberName, setNewSupportMemberName] = useState("");
+  const [newAdminNotes, setNewAdminNotes] = useState("");
+  const [newMediabuyerNotes, setNewMediabuyerNotes] = useState("");
 
   // Edit form state
   const [editingLog, setEditingLog] = useState<CallLog | null>(null);
   const [editedStatus, setEditedStatus] = useState("");
   const [editedNotes, setEditedNotes] = useState("");
+  const [editedSupportMemberName, setEditedSupportMemberName] = useState("");
+  const [editedAdminNotes, setEditedAdminNotes] = useState("");
+  const [editedMediabuyerNotes, setEditedMediabuyerNotes] = useState("");
 
   const canEditLogs = userRole === "customercare" || userRole === "admin";
+  const isAdmin = userRole === "admin";
+  const isMediabuyer = userRole === "mediabuyer";
+  const isCustomercare = userRole === "customercare";
 
   const processedLogs = useMemo(() => {
     if (!appointment?.callLogs) return [];
@@ -1032,7 +1051,10 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
           state.searchTerm === "" ||
           log.status.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
           (log.notes || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.agentName || "").toLowerCase().includes(state.searchTerm.toLowerCase());
+          (log.agentName || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+          (log.support_member_name || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+          (log.admin_notes || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+          (log.mediabuyer_notes || "").toLowerCase().includes(state.searchTerm.toLowerCase());
         const matchesStatus =
           state.statusFilter === "all" || log.status === state.statusFilter;
         return matchesSearch && matchesStatus;
@@ -1052,12 +1074,21 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
         notes: newCallLogNotes.trim() || undefined,
         agentName: username || "غير معروف",
         timezone: getUserTimezone(),
+        support_member_name: newSupportMemberName.trim() || undefined,
+        admin_notes: isAdmin ? newAdminNotes.trim() || undefined : undefined,
+        mediabuyer_notes: isMediabuyer ? newMediabuyerNotes.trim() || undefined : undefined,
+        created_by_role: userRole as any,
       };
+      
       const updatedLogs = [...(appointment.callLogs || []), newLog];
       await onUpdateCallLogs(appointment.id, updatedLogs);
 
+      // Reset form
       setNewCallLogStatus("");
       setNewCallLogNotes("");
+      setNewSupportMemberName("");
+      setNewAdminNotes("");
+      setNewMediabuyerNotes("");
       setAddPopupOpen(false);
     } catch (error: any) {
       setState((prev) => ({
@@ -1067,7 +1098,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     } finally {
       setState((prev) => ({ ...prev, loading: false }));
     }
-  }, [appointment, newCallLogStatus, newCallLogNotes, username, onUpdateCallLogs]);
+  }, [appointment, newCallLogStatus, newCallLogNotes, newSupportMemberName, newAdminNotes, newMediabuyerNotes, username, userRole, isAdmin, isMediabuyer, onUpdateCallLogs]);
 
   const saveEditedLog = async () => {
     if (!appointment || !editingLog) return;
@@ -1080,6 +1111,9 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
               ...log,
               status: editedStatus,
               notes: editedNotes.trim() || undefined,
+              support_member_name: editedSupportMemberName.trim() || undefined,
+              admin_notes: isAdmin ? editedAdminNotes.trim() || undefined : log.admin_notes,
+              mediabuyer_notes: isMediabuyer ? editedMediabuyerNotes.trim() || undefined : log.mediabuyer_notes,
               timestamp: createTimestamp(),
               editedBy: username || "غير معروف",
               timezone: getUserTimezone(),
@@ -1116,11 +1150,24 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     }
   };
 
+  // Function to check if a note should be visible based on user role
+  const shouldShowNote = (log: CallLog, noteType: 'admin_notes' | 'mediabuyer_notes') => {
+    if (noteType === 'admin_notes') {
+      // Admin notes: only visible to admin role
+      return isAdmin;
+    }
+    if (noteType === 'mediabuyer_notes') {
+      // Mediabuyer notes: visible to customercare and mediabuyer roles
+      return isMediabuyer || isCustomercare;
+    }
+    return false;
+  };
+
   if (!open || !appointment) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] sm:max极速赛车开奖直播历史记录-极速赛车开奖结果-极速赛车开奖官网查询--h-[85vh] flex flex-col mx-auto overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] flex flex-col mx-auto overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center">
           <div>
@@ -1162,6 +1209,9 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
                           setEditingLog(log);
                           setEditedStatus(log.status);
                           setEditedNotes(log.notes || "");
+                          setEditedSupportMemberName(log.support_member_name || "");
+                          setEditedAdminNotes(log.admin_notes || "");
+                          setEditedMediabuyerNotes(log.mediabuyer_notes || "");
                           setEditPopupOpen(true);
                         }}
                         className="p-2 text-gray-400 hover:text-blue-600 rounded-md"
@@ -1177,13 +1227,48 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
                     </div>
                   )}
                 </div>
-                {log.notes && (
+                
+                {/* Support Member Name - Visible to all roles except clients (all our system roles can see this) */}
+                {log.support_member_name && (
                   <p className="mt-2 text-sm text-gray-700 flex items-start gap-2">
-                    <StickyNote className="h-4 w-4 text-blue-500" />
-                    {log.notes}
+                    <User className="h-4 w-4 text-green-500 mt-0.5" />
+                    <div>
+                      <strong className="text-green-700">اسم عضو الدعم:</strong> {log.support_member_name}
+                    </div>
                   </p>
                 )}
-                <div className="mt-2 text-xs text-gray-500 flex gap-4">
+                
+                {/* General Notes - Visible to all */}
+                {log.notes && (
+                  <p className="mt-2 text-sm text-gray-700 flex items-start gap-2">
+                    <StickyNote className="h-4 w-4 text-blue-500 mt-0.5" />
+                    <div>
+                      <strong className="text-blue-700">ملاحظات عامة:</strong> {log.notes}
+                    </div>
+                  </p>
+                )}
+                
+                {/* Admin Notes - Only visible to admin */}
+                {log.admin_notes && shouldShowNote(log, 'admin_notes') && (
+                  <p className="mt-2 text-sm text-purple-700 flex items-start gap-2">
+                    <StickyNote className="h-4 w-4 text-purple-500 mt-0.5" />
+                    <div>
+                      <strong className="text-purple-700">ملاحظات المدير:</strong> {log.admin_notes}
+                    </div>
+                  </p>
+                )}
+                
+                {/* Mediabuyer Notes - Only visible to mediabuyer and customercare */}
+                {log.mediabuyer_notes && shouldShowNote(log, 'mediabuyer_notes') && (
+                  <p className="mt-2 text-sm text-orange-700 flex items-start gap-2">
+                    <StickyNote className="h-4 w-4 text-orange-500 mt-0.5" />
+                    <div>
+                      <strong className="text-orange-700">ملاحظات الوسيط:</strong> {log.mediabuyer_notes}
+                    </div>
+                  </p>
+                )}
+                
+                <div className="mt-2 text-xs text-gray-500 flex flex-wrap gap-4">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {formatDisplayDateTime(log.timestamp)}
@@ -1192,6 +1277,15 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
                     <User className="h-3 w-3" />
                     {log.agentName || "غير معروف"}
                   </span>
+                  {log.created_by_role && (
+                    <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                      <span className="capitalize text-gray-600">
+                        {log.created_by_role === 'admin' ? 'مدير' : 
+                         log.created_by_role === 'mediabuyer' ? 'وسيط' : 
+                         log.created_by_role === 'customercare' ? 'خدمة عملاء' : log.created_by_role}
+                      </span>
+                    </span>
+                  )}
                 </div>
               </div>
             ))
@@ -1215,13 +1309,15 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
       {/* Add Popup */}
       {addPopupOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">إضافة سجل جديد</h3>
-            <label className="block mb-2 text-sm">الحالة *</label>
+            
+            <label className="block mb-2 text-sm font-medium">الحالة *</label>
             <select
               value={newCallLogStatus}
               onChange={(e) => setNewCallLogStatus(e.target.value)}
               className="w-full mb-3 border rounded p-2"
+              required
             >
               <option value="">اختر الحالة</option>
               {callLogStatusOptions.map((status) => (
@@ -1230,13 +1326,53 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
                 </option>
               ))}
             </select>
-            <label className="block mb-2 text-sm">ملاحظات</label>
+
+            <label className="block mb-2 text-sm font-medium">اسم عضو الدعم</label>
+            <input
+              type="text"
+              value={newSupportMemberName}
+              onChange={(e) => setNewSupportMemberName(e.target.value)}
+              placeholder="اسم عضو فريق الدعم"
+              className="w-full mb-3 border rounded p-2"
+            />
+
+            <label className="block mb-2 text-sm font-medium">ملاحظات عامة</label>
             <textarea
               value={newCallLogNotes}
               onChange={(e) => setNewCallLogNotes(e.target.value)}
-              rows={3}
-              className="w-full border rounded p-2 mb-4"
+              rows={2}
+              placeholder="ملاحظات عامة مرئية للجميع"
+              className="w-full border rounded p-2 mb-3"
             />
+
+            {/* Admin Notes - Only show for admin users */}
+            {isAdmin && (
+              <>
+                <label className="block mb-2 text-sm font-medium text-purple-700">ملاحظات المدير</label>
+                <textarea
+                  value={newAdminNotes}
+                  onChange={(e) => setNewAdminNotes(e.target.value)}
+                  rows={2}
+                  placeholder="ملاحظات خاصة بالإدارة فقط"
+                  className="w-full border border-purple-200 rounded p-2 mb-3"
+                />
+              </>
+            )}
+
+            {/* Mediabuyer Notes - Only show for mediabuyer users */}
+            {isMediabuyer && (
+              <>
+                <label className="block mb-2 text-sm font-medium text-orange-700">ملاحظات الوسيط</label>
+                <textarea
+                  value={newMediabuyerNotes}
+                  onChange={(e) => setNewMediabuyerNotes(e.target.value)}
+                  rows={2}
+                  placeholder="ملاحظات خاصة بالوسيط وخدمة العملاء"
+                  className="w-full border border-orange-200 rounded p-2 mb-3"
+                />
+              </>
+            )}
+
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setAddPopupOpen(false)}
@@ -1247,7 +1383,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
               <button
                 onClick={addNewCallLog}
                 disabled={!newCallLogStatus || state.loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
               >
                 {state.loading ? "جاري الإضافة..." : "إضافة"}
               </button>
@@ -1259,13 +1395,15 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
       {/* Edit Popup */}
       {editPopupOpen && editingLog && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">تعديل السجل</h3>
-            <label className="block mb-2 text-sm">الحالة *</label>
+            
+            <label className="block mb-2 text-sm font-medium">الحالة *</label>
             <select
               value={editedStatus}
               onChange={(e) => setEditedStatus(e.target.value)}
               className="w-full mb-3 border rounded p-2"
+              required
             >
               {callLogStatusOptions.map((status) => (
                 <option key={status} value={status}>
@@ -1273,13 +1411,49 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
                 </option>
               ))}
             </select>
-            <label className="block mb-2 text-sm">ملاحظات</label>
+
+            <label className="block mb-2 text-sm font-medium">اسم عضو الدعم</label>
+            <input
+              type="text"
+              value={editedSupportMemberName}
+              onChange={(e) => setEditedSupportMemberName(e.target.value)}
+              className="w-full mb-3 border rounded p-2"
+            />
+
+            <label className="block mb-2 text-sm font-medium">ملاحظات عامة</label>
             <textarea
               value={editedNotes}
               onChange={(e) => setEditedNotes(e.target.value)}
-              rows={3}
-              className="w-full border rounded p-2 mb-4"
+              rows={2}
+              className="w-full border rounded p-2 mb-3"
             />
+
+            {/* Admin Notes - Only show for admin users */}
+            {isAdmin && (
+              <>
+                <label className="block mb-2 text-sm font-medium text-purple-700">ملاحظات المدير</label>
+                <textarea
+                  value={editedAdminNotes}
+                  onChange={(e) => setEditedAdminNotes(e.target.value)}
+                  rows={2}
+                  className="w-full border border-purple-200 rounded p-2 mb-3"
+                />
+              </>
+            )}
+
+            {/* Mediabuyer Notes - Only show for mediabuyer users */}
+            {isMediabuyer && (
+              <>
+                <label className="block mb-2 text-sm font-medium text-orange-700">ملاحظات الوسيط</label>
+                <textarea
+                  value={editedMediabuyerNotes}
+                  onChange={(e) => setEditedMediabuyerNotes(e.target.value)}
+                  rows={2}
+                  className="w-full border border-orange-200 rounded p-2 mb-3"
+                />
+              </>
+            )}
+
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setEditPopupOpen(false)}
@@ -1290,7 +1464,7 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
               <button
                 onClick={saveEditedLog}
                 disabled={state.loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
               >
                 {state.loading ? "جاري الحفظ..." : "حفظ"}
               </button>
