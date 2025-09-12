@@ -92,8 +92,10 @@ console.log(role);
               {(role === "admin" || role === "mediabuyer") && (
                 <Route path="/landingPage/:id" element={<LandingPageEditor />} />
               )}
-              <Route path="/doctors" element={<DataTableHeaders />} />
+              {(role === "admin" || role === "customercare") && (
               <Route path="/inquiries" element={<Inquiries />} />
+              )}
+              <Route path="/doctors" element={<DataTableHeaders />} />
               <Route path="/testimonials" element={<TestimonialsDashboard />} />
               <Route path="/blogs" element={<BlogsDashboard />} />
               <Route path="/blogs/:id" element={<BlogSinglePage />} />

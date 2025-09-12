@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCalendarCheck,  faCity,   faCommentDots,   faFileMedicalAlt,   faGift,   faHouseMedical,   faLaptopMedical,   faPager,  faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarCheck,  faCity,   faCommentDots,   faFileMedicalAlt,   faGift,   faHouseMedical,   faLaptopMedical,   faPager,  faQuestionCircle,  faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
 import { useState } from "react";
 export default function Sidebar({ toggleSidebar }: { toggleSidebar: (state: boolean) => void }) {
     const location = useLocation();
@@ -18,18 +18,22 @@ export default function Sidebar({ toggleSidebar }: { toggleSidebar: (state: bool
         ...(role === "admin" || role === "mediabuyer"
             ? [{ label: "انشاء صفحة هبوط", icon: faPager, path: "/landingPage" }]
             : []),
-        { label: "الحجوزات", icon: faCalendarCheck, path: "/leads" },
-...(role === "admin" ? [
-        { label: "المناطق والفروع", icon: faCity, path: "/regions&branches" },
-        { label: "الاقسام", icon: faHouseMedical, path: "/departments" },
-        { label: "الاطباء", icon: faUserDoctor, path: "/doctors" },
-        { label: "الخدمات", icon: faStethoscope, path: "/services" },
-        { label: "العروض", icon: faGift, path: "/offers" },
-        { label: "الاجهزة", icon: faLaptopMedical, path: "/devices" },
-        { label: "المقالات", icon: faFileMedicalAlt, path: "/blogs" },
-        { label: "الاراء", icon: faCommentDots, path: "/testimonials" },
-        
-    ] : []),
+            { label: "الحجوزات", icon: faCalendarCheck, path: "/leads" },
+            ...(role === "admin" ? [
+                { label: "المناطق والفروع", icon: faCity, path: "/regions&branches" },
+                { label: "الاقسام", icon: faHouseMedical, path: "/departments" },
+                { label: "الاطباء", icon: faUserDoctor, path: "/doctors" },
+                { label: "الخدمات", icon: faStethoscope, path: "/services" },
+                { label: "العروض", icon: faGift, path: "/offers" },
+                { label: "الاجهزة", icon: faLaptopMedical, path: "/devices" },
+                { label: "المقالات", icon: faFileMedicalAlt, path: "/blogs" },
+                { label: "الاراء", icon: faCommentDots, path: "/testimonials" },
+                
+            ] : []),
+            ...(role === "admin" || role === "customercare"
+                ? [        { label: "الاستفسارات", icon: faQuestionCircle, path: "/inquiries" }
+        ]
+                : []),
         { label: "تسجيل الخروج", icon: faSignOutAlt, path: "/logout", isLogout: true },
     ];
 

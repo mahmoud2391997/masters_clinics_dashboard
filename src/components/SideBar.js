@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCalendarCheck, faCity, faCommentDots, faFileMedicalAlt, faGift, faHouseMedical, faLaptopMedical, faPager, faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarCheck, faCity, faCommentDots, faFileMedicalAlt, faGift, faHouseMedical, faLaptopMedical, faPager, faQuestionCircle, faSignOutAlt, faStethoscope, faUserDoctor } from "@fortawesome/free-solid-svg-icons";
 import { useState } from "react";
 export default function Sidebar({ toggleSidebar }) {
     const location = useLocation();
@@ -27,6 +27,10 @@ export default function Sidebar({ toggleSidebar }) {
             { label: "المقالات", icon: faFileMedicalAlt, path: "/blogs" },
             { label: "الاراء", icon: faCommentDots, path: "/testimonials" },
         ] : []),
+        ...(role === "admin" || role === "customercare"
+            ? [{ label: "الاستفسارات", icon: faQuestionCircle, path: "/inquiries" }
+            ]
+            : []),
         { label: "تسجيل الخروج", icon: faSignOutAlt, path: "/logout", isLogout: true },
     ];
     function handleLogout() {

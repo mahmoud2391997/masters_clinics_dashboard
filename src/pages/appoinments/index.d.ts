@@ -1,16 +1,21 @@
 import React from "react";
+interface CallLog {
+    id: string;
+    appointmentId: string;
+    timestamp: string;
+    status: string;
+    notes?: string | null;
+    support_member_name?: string | null;
+    mediabuyer_name?: string | null;
+    admin_notes?: string | null;
+    mediabuyer_notes?: string | null;
+    timezone?: string;
+    created_by_role?: "customercare" | "mediabuyer" | "admin";
+    editedBy?: string;
+}
 interface FormField {
     key: string;
     label?: string;
-}
-interface CallLog {
-    id?: string;
-    timestamp: string;
-    status: string;
-    notes?: string;
-    agentName?: string;
-    editedBy?: string;
-    timezone?: string;
 }
 interface Appointment {
     id: string;
@@ -42,4 +47,24 @@ interface DataTableProps {
     userRole: "customercare" | "mediabuyer" | "admin";
 }
 declare const DataTable: React.FC<Partial<DataTableProps>>;
+interface Appointment {
+    id: string;
+    name: string;
+    phone: string;
+    callLogs?: CallLog[];
+}
+interface CallLog {
+    id: string;
+    appointmentId: string;
+    timestamp: string;
+    status: string;
+    notes?: string | null;
+    support_member_name?: string | null;
+    mediabuyer_name?: string | null;
+    admin_notes?: string | null;
+    mediabuyer_notes?: string | null;
+    timezone?: string;
+    created_by_role?: "customercare" | "mediabuyer" | "admin";
+    editedBy?: string;
+}
 export default DataTable;

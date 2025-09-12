@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 // Define types for our data
@@ -80,13 +80,10 @@ const Inquiries = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+    <div className="min-h-screen  p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
-            <h1 className="text-2xl md:text-3xl font-bold">نظام إدارة الاستفسارات</h1>
-            <p className="mt-2 opacity-90">عرض وتتبع جميع استفسارات العملاء في مكان واحد</p>
-          </div>
+          
           
           <div className="p-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">

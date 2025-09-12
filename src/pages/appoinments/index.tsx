@@ -9,7 +9,6 @@ import {
   X, 
   Search, 
   StickyNote, 
-  User,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
@@ -42,47 +41,49 @@ const getUserTimezone = (): string => {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
 
-// Interfaces
+// Updated CallLog interface
+
+interface CallLog {
+  id: string;
+  appointmentId: string;
+  timestamp: string;
+  status: string;
+  notes?: string | null;
+  support_member_name?: string | null;
+  mediabuyer_name?: string | null;
+  admin_notes?: string | null;
+  mediabuyer_notes?: string | null;
+  timezone?: string;
+  created_by_role?: "customercare" | "mediabuyer" | "admin";
+  editedBy?: string;
+}
+
 interface FormField {
   key: string
   label?: string
 }
 
-interface CallLog {
-  id?: string
-  timestamp: string
-  status: string
-  notes?: string
-  agentName?: string
-  editedBy?: string
-  timezone?: string
-  support_member_name?: string
-  admin_notes?: string
-  mediabuyer_notes?: string
-  created_by_role?: 'admin' | 'mediabuyer' | 'customercare'
-}
-
 interface Appointment {
-  id: string
-  _id?: string
-  name: string
-  phone: string
-  branch: string
-  createdAt: string
-  scheduledAt?: string | null
-  landingPageId: string
-  utmSource?: string
-  doctor?: string
-  offer?: string
-  device?: string
-  type?: string
-  is_authed: number
-  payment_status: string
-  status: string
-  callLogs?: CallLog[]
-  pageCreator?: string
-  pageTitle?: string
-  [key: string]: any
+  id: string;
+  _id?: string;
+  name: string;
+  phone: string;
+  branch: string;
+  createdAt: string;
+  scheduledAt?: string | null;
+  landingPageId: string;
+  utmSource?: string;
+  doctor?: string;
+  offer?: string;
+  device?: string;
+  type?: string;
+  is_authed: number;
+  payment_status: string;
+  status: string;
+  callLogs?: CallLog[];
+  pageCreator?: string;
+  pageTitle?: string;
+  [key: string]: any;
 }
 
 interface DataTableProps {
@@ -173,36 +174,6 @@ const defaultFormFields: FormField[] = [
 const defaultData: Appointment[] = []
 
 // API functions
-const updateAppointments = async (id: string, data: Partial<Appointment>) => {
-  console.log(`Updating appointment ${id} with data:`, data);
-  if (data.callLogs) {
-    data.callLogs = data.callLogs.map(log => ({
-      ...log,
-      timestamp: log.timestamp || createTimestamp(),
-      timezone: log.timezone || getUserTimezone(),
-    }));
-  }
-  try {
-    const token = sessionStorage.getItem("token")
-    const response = await fetch(`https://www.ss.mastersclinics.com/appointments/${id}`, {
-      method: "PUT",
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || "Failed to update appointment")
-    }
-    return await response.json()
-  } catch (error) {
-    console.error("Error updating appointment:", error)
-    throw error
-  }
-}
-
 const deleteAppointment = async (id: string) => {
   try {
     const token = sessionStorage.getItem("token")
@@ -221,6 +192,31 @@ const deleteAppointment = async (id: string) => {
     throw error
   }
 }
+
+const updateAppointments = async (id: string, data: Partial<Appointment>) => {
+  console.log(`Updating appointment ${id} with data:`, data);
+  try {
+    const token = sessionStorage.getItem("token");
+    const response = await fetch(`https://www.ss.mastersclinics.com/appointments/${id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "فشل في تحديث الموعد");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating appointment:", error);
+    throw error;
+  }
+};
 
 // Chip Component
 const Chip: React.FC<{
@@ -307,7 +303,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
       if (!response.ok) throw new Error("Network error")
       const data = await response.json();
-    console.log(data);
+      console.log(data);
     
       setState((prev) => ({
         ...prev,
@@ -444,21 +440,25 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     }))
   }
 
+  // Updated scheduleAppointment function
   const scheduleAppointment = useCallback(async () => {
     if (!schedulingAppointment || !newScheduledDateTime) return
     setState((prev) => ({ ...prev, isScheduling: true, error: null }))
     try {
       const scheduledDate = new Date(newScheduledDateTime)
       const mysqlDateTime = formatDateTimeForMySQL(scheduledDate)
+      
       const schedulingLog: CallLog = {
         id: `schedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        appointmentId: schedulingAppointment.id,
         timestamp: createTimestamp(),
         status: "تم الحجز",
         notes: `تم تحديد موعد الحجز: ${formatDisplayDateTime(mysqlDateTime)}`,
-        agentName: username || "غير معروف",
+        support_member_name: username || "غير معروف", // Changed from agentName
         timezone: getUserTimezone(),
         created_by_role: role as any,
-      }
+      };
+
       const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog]
       await updateAppointments(schedulingAppointment.id, {
         scheduledAt: mysqlDateTime,
@@ -477,19 +477,22 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
     }
   }, [schedulingAppointment, newScheduledDateTime, username, role, fetchData])
 
+  // Updated unscheduleAppointment function
   const unscheduleAppointment = useCallback(async () => {
     if (!schedulingAppointment) return
     setState((prev) => ({ ...prev, isScheduling: true, error: null }))
     try {
       const unschedulingLog: CallLog = {
         id: `unschedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        appointmentId: schedulingAppointment.id,
         timestamp: createTimestamp(),
         status: "تم إلغاء الحجز",
         notes: "تم إلغاء موعد الحجز",
-        agentName: username || "غير معروف",
+        support_member_name: username || "غير معروف", // Changed from agentName
         timezone: getUserTimezone(),
         created_by_role: role as any,
-      }
+      };
+
       const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog]
       await updateAppointments(schedulingAppointment.id, {
         scheduledAt: null,
@@ -567,7 +570,6 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
       {row.type === "branch" && (
         <div className="font-medium text-gray-700">فرع: {row.branch}</div>
       )}
-      {/* Show additional info for cross-referencing */}
       {row.type !== "device" && row.device && (
         <div className="text-xs text-gray-500">جهاز: {row.device}</div>
       )}
@@ -799,7 +801,7 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
                           />
                           <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
                             <div className="font-medium">{formatDisplayDateTime(lastCall.timestamp)}</div>
-                            <div className="mt-1">بواسطة: {lastCall.agentName || 'غير معروف'}</div>
+                            <div className="mt-1">بواسطة: {lastCall.support_member_name || 'غير معروف'}</div>
                             {lastCall.notes && (
                               <div className="mt-1">ملاحظة: {lastCall.notes}</div>
                             )}
@@ -992,6 +994,30 @@ const DataTable: React.FC<Partial<DataTableProps>> = ({
   )
 }
 
+
+// Types
+interface Appointment {
+  id: string;
+  name: string;
+  phone: string;
+  callLogs?: CallLog[];
+}
+
+interface CallLog {
+  id: string;
+  appointmentId: string;
+  timestamp: string;
+  status: string;
+  notes?: string | null;
+  support_member_name?: string | null;
+  mediabuyer_name?: string | null;
+  admin_notes?: string | null;
+  mediabuyer_notes?: string | null;
+  timezone?: string;
+  created_by_role?: "customercare" | "mediabuyer" | "admin";
+  editedBy?: string;
+}
+
 interface CallLogManagerProps {
   open: boolean;
   onClose: () => void;
@@ -1000,9 +1026,7 @@ interface CallLogManagerProps {
   userRole: "customercare" | "mediabuyer" | "admin";
   username: string;
 }
-// ... (previous code remains the same)
 
-// CallLogManager component with proper role-based field visibility
 const CallLogManager: React.FC<CallLogManagerProps> = ({
   open,
   onClose,
@@ -1019,76 +1043,111 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     error: null as string | null,
   });
 
-  // Popup controls
   const [addPopupOpen, setAddPopupOpen] = useState(false);
   const [editPopupOpen, setEditPopupOpen] = useState(false);
+  const [mediabuyerNotesPopupOpen, setMediabuyerNotesPopupOpen] = useState(false);
 
-  // Add form state
+  // Add New Log Form
   const [newCallLogStatus, setNewCallLogStatus] = useState("");
   const [newCallLogNotes, setNewCallLogNotes] = useState("");
   const [newSupportMemberName, setNewSupportMemberName] = useState("");
   const [newAdminNotes, setNewAdminNotes] = useState("");
   const [newMediabuyerNotes, setNewMediabuyerNotes] = useState("");
 
-  // Edit form state
+  // Edit Full Log
   const [editingLog, setEditingLog] = useState<CallLog | null>(null);
   const [editedStatus, setEditedStatus] = useState("");
   const [editedNotes, setEditedNotes] = useState("");
   const [editedSupportMemberName, setEditedSupportMemberName] = useState("");
   const [editedAdminNotes, setEditedAdminNotes] = useState("");
+  const [editedMediabuyerName, setEditedMediabuyerName] = useState("");
   const [editedMediabuyerNotes, setEditedMediabuyerNotes] = useState("");
+
+  // Media Buyer Notes Popup
+  const [mediabuyerEditingLog, setMediabuyerEditingLog] = useState<CallLog | null>(null);
+  const [mediabuyerNotes, setMediabuyerNotes] = useState("");
 
   const canEditLogs = userRole === "customercare" || userRole === "admin";
   const isAdmin = userRole === "admin";
   const isMediabuyer = userRole === "mediabuyer";
-  const isCustomercare = userRole === "customercare";
 
+  // Filter & sort logs
   const processedLogs = useMemo(() => {
     if (!appointment?.callLogs) return [];
     return appointment.callLogs
       .filter((log) => {
+        const term = state.searchTerm.toLowerCase();
         const matchesSearch =
-          state.searchTerm === "" ||
-          log.status.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.notes || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.agentName || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.support_member_name || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.admin_notes || "").toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-          (log.mediabuyer_notes || "").toLowerCase().includes(state.searchTerm.toLowerCase());
+          !term ||
+          log.status.toLowerCase().includes(term) ||
+          (log.notes || "").toLowerCase().includes(term) ||
+          (log.support_member_name || "").toLowerCase().includes(term) ||
+          (log.mediabuyer_name || "").toLowerCase().includes(term) ||
+          (log.admin_notes || "").toLowerCase().includes(term) ||
+          (log.mediabuyer_notes || "").toLowerCase().includes(term);
+
         const matchesStatus =
           state.statusFilter === "all" || log.status === state.statusFilter;
+
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [appointment?.callLogs, state.searchTerm, state.statusFilter]);
 
-  const addNewCallLog = useCallback(async () => {
+  // Reset form states
+  const resetAddForm = () => {
+    setNewCallLogStatus("");
+    setNewCallLogNotes("");
+    setNewSupportMemberName("");
+    setNewAdminNotes("");
+    setNewMediabuyerNotes("");
+  };
+
+  const resetEditForm = () => {
+    setEditingLog(null);
+    setEditedStatus("");
+    setEditedNotes("");
+    setEditedSupportMemberName("");
+    setEditedAdminNotes("");
+    setEditedMediabuyerName("");
+    setEditedMediabuyerNotes("");
+  };
+
+  // Open edit popup
+  const openEditPopup = (log: CallLog) => {
+    setEditingLog(log);
+    setEditedStatus(log.status);
+    setEditedNotes(log.notes || "");
+    setEditedSupportMemberName(log.support_member_name || "");
+    setEditedAdminNotes(log.admin_notes || "");
+    setEditedMediabuyerName(log.mediabuyer_name || "");
+    setEditedMediabuyerNotes(log.mediabuyer_notes || "");
+    setEditPopupOpen(true);
+  };
+
+  // Add new full call log
+  const addNewCallLog = async () => {
     if (!appointment || !newCallLogStatus) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
-
     try {
       const newLog: CallLog = {
-        id: `log_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        appointmentId: appointment.id,
         timestamp: createTimestamp(),
         status: newCallLogStatus,
-        notes: newCallLogNotes.trim() || undefined,
-        agentName: username || "غير معروف",
+        notes: newCallLogNotes.trim() || null,
+        support_member_name: newSupportMemberName.trim() || username || "غير معروف",
+        mediabuyer_name: isMediabuyer ? (newMediabuyerNotes ? username : null) : null,
         timezone: getUserTimezone(),
-        support_member_name: newSupportMemberName.trim() || undefined,
-        admin_notes: isAdmin ? newAdminNotes.trim() || undefined : undefined,
-        mediabuyer_notes: isMediabuyer ? newMediabuyerNotes.trim() || undefined : undefined,
-        created_by_role: userRole as any,
+        admin_notes: isAdmin ? newAdminNotes.trim() || null : null,
+        mediabuyer_notes: isMediabuyer ? newMediabuyerNotes.trim() || null : null,
+        created_by_role: userRole,
       };
-      
+
       const updatedLogs = [...(appointment.callLogs || []), newLog];
       await onUpdateCallLogs(appointment.id, updatedLogs);
 
-      // Reset form
-      setNewCallLogStatus("");
-      setNewCallLogNotes("");
-      setNewSupportMemberName("");
-      setNewAdminNotes("");
-      setNewMediabuyerNotes("");
+      resetAddForm();
       setAddPopupOpen(false);
     } catch (error: any) {
       setState((prev) => ({
@@ -1098,31 +1157,32 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     } finally {
       setState((prev) => ({ ...prev, loading: false }));
     }
-  }, [appointment, newCallLogStatus, newCallLogNotes, newSupportMemberName, newAdminNotes, newMediabuyerNotes, username, userRole, isAdmin, isMediabuyer, onUpdateCallLogs]);
+  };
 
+  // Save full edit
   const saveEditedLog = async () => {
     if (!appointment || !editingLog) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
-
     try {
-      const updatedLogs = (appointment.callLogs || []).map((log) =>
+      const updatedLogs = appointment.callLogs!.map((log) =>
         log.id === editingLog.id
           ? {
               ...log,
               status: editedStatus,
-              notes: editedNotes.trim() || undefined,
-              support_member_name: editedSupportMemberName.trim() || undefined,
-              admin_notes: isAdmin ? editedAdminNotes.trim() || undefined : log.admin_notes,
-              mediabuyer_notes: isMediabuyer ? editedMediabuyerNotes.trim() || undefined : log.mediabuyer_notes,
+              notes: editedNotes.trim() || null,
+              support_member_name: editedSupportMemberName.trim() || null,
+              mediabuyer_name: editedMediabuyerName.trim() || null,
+              admin_notes: isAdmin ? editedAdminNotes.trim() || null : log.admin_notes,
+              mediabuyer_notes: isMediabuyer ? editedMediabuyerNotes.trim() || null : log.mediabuyer_notes,
               timestamp: createTimestamp(),
-              editedBy: username || "غير معروف",
+              editedBy: username,
               timezone: getUserTimezone(),
             }
           : log
       );
-      await onUpdateCallLogs(appointment.id, updatedLogs);
 
-      setEditingLog(null);
+      await onUpdateCallLogs(appointment.id, updatedLogs);
+      resetEditForm();
       setEditPopupOpen(false);
     } catch (error: any) {
       setState((prev) => ({
@@ -1134,11 +1194,95 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     }
   };
 
-  const deleteCallLog = async (logId: string | undefined) => {
-    if (!appointment || !window.confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
+  // Open Media Buyer Notes Popup
+  const openMediabuyerNotesPopup = (log: CallLog) => {
+    setMediabuyerEditingLog(log);
+    setMediabuyerNotes(log.mediabuyer_notes || "");
+    setEditedMediabuyerName(log.mediabuyer_name || username);
+    setMediabuyerNotesPopupOpen(true);
+  };
+
+  // Save Media Buyer Notes (with name)
+  const saveMediabuyerNotes = async () => {
+    if (!appointment || !mediabuyerEditingLog) return;
+
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const updatedLogs = (appointment.callLogs || []).filter((log) => log.id !== logId);
+      const trimmedNotes = mediabuyerNotes.trim();
+      const finalName = editedMediabuyerName.trim() || username;
+
+      let updatedLogs: CallLog[];
+
+      if (trimmedNotes) {
+        // Update existing log or add new note-only log
+        updatedLogs = appointment.callLogs!.map((log) =>
+          log.id === mediabuyerEditingLog.id
+            ? {
+                ...log,
+                mediabuyer_notes: trimmedNotes,
+                mediabuyer_name: finalName,
+                timestamp: createTimestamp(),
+                editedBy: username,
+                timezone: getUserTimezone(),
+              }
+            : log
+        );
+
+        // If this is a new standalone note (e.g., no prior log selected)
+        if (
+          !mediabuyerEditingLog.id ||
+          !appointment.callLogs?.find((l) => l.id === mediabuyerEditingLog.id)
+        ) {
+          const newNoteLog: CallLog = {
+            id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            appointmentId: appointment.id,
+            status: "ملاحظات الميديا باير",
+            mediabuyer_notes: trimmedNotes,
+            mediabuyer_name: finalName,
+            support_member_name: username,
+            timestamp: createTimestamp(),
+            timezone: getUserTimezone(),
+            created_by_role: "mediabuyer",
+          };
+          updatedLogs = [...updatedLogs, newNoteLog];
+        }
+      } else {
+        // Clear notes
+        updatedLogs = appointment.callLogs!.map((log) =>
+          log.id === mediabuyerEditingLog.id
+            ? {
+                ...log,
+                mediabuyer_notes: null,
+                mediabuyer_name: null,
+                timestamp: createTimestamp(),
+                editedBy: username,
+                timezone: getUserTimezone(),
+              }
+            : log
+        );
+      }
+
+      await onUpdateCallLogs(appointment.id, updatedLogs);
+      setMediabuyerEditingLog(null);
+      setMediabuyerNotes("");
+      setEditedMediabuyerName("");
+      setMediabuyerNotesPopupOpen(false);
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        error: error.message || "فشل في حفظ ملاحظات الميديا باير",
+      }));
+    } finally {
+      setState((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Delete entire log
+  const deleteCallLog = async (logId: string | undefined) => {
+    if (!appointment || !logId || !window.confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const updatedLogs = appointment.callLogs!.filter((log) => log.id !== logId);
       await onUpdateCallLogs(appointment.id, updatedLogs);
     } catch (error: any) {
       setState((prev) => ({
@@ -1150,140 +1294,163 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
     }
   };
 
-  // Function to check if a note should be visible based on user role
-  const shouldShowNote = (log: CallLog, noteType: 'admin_notes' | 'mediabuyer_notes') => {
-    if (noteType === 'admin_notes') {
-      // Admin notes: only visible to admin role
-      return isAdmin;
+  // Delete only media buyer notes
+  const deleteMediabuyerNotes = async (logId: string | undefined) => {
+    if (!appointment || !logId || !window.confirm("هل أنت متأكد من حذف ملاحظات الميديا باير؟")) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const updatedLogs = appointment.callLogs!.map((log) =>
+        log.id === logId
+          ? {
+              ...log,
+              mediabuyer_notes: null,
+              mediabuyer_name: null,
+              timestamp: createTimestamp(),
+              editedBy: username,
+              timezone: getUserTimezone(),
+            }
+          : log
+      );
+      await onUpdateCallLogs(appointment.id, updatedLogs);
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        error: error.message || "فشل في حذف ملاحظات الميديا باير",
+      }));
+    } finally {
+      setState((prev) => ({ ...prev, loading: false }));
     }
-    if (noteType === 'mediabuyer_notes') {
-      // Mediabuyer notes: visible to customercare and mediabuyer roles
-      return isMediabuyer || isCustomercare;
-    }
-    return false;
   };
 
   if (!open || !appointment) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] flex flex-col mx-auto overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center">
+        <div className="flex-shrink-0 p-6 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <History className="h-5 w-5 text-blue-600" />
               سجلات الاتصال
             </h2>
-            <p className="text-xs text-gray-600 mt-1">
-              {appointment.name} - {appointment.phone}
-            </p>
+            <p className="text-sm text-gray-600 mt-1">{appointment.name} - {appointment.phone}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md"
-          >
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-md">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Logs */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Search & Filters */}
+        <div className="flex-shrink-0 p-4 border-b bg-gray-50">
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="بحث في السجلات..."
+                value={state.searchTerm}
+                onChange={(e) => setState((prev) => ({ ...prev, searchTerm: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <select
+              value={state.statusFilter}
+              onChange={(e) => setState((prev) => ({ ...prev, statusFilter: e.target.value }))}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">جميع الحالات</option>
+              {callLogStatusOptions.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Logs List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {processedLogs.length === 0 ? (
             <p className="text-center text-gray-500">لا توجد سجلات</p>
           ) : (
             processedLogs.map((log) => (
-              <div
-                key={log.id}
-                className="bg-white border border-gray-200 rounded-md p-3 mb-3 shadow-sm"
-              >
-                <div className="flex justify-between items-start">
-                  <Chip
-                    label={log.status}
-                    className="bg-blue-100 text-blue-800 border-blue-200 text-xs"
-                  />
-                  {canEditLogs && (
-                    <div className="flex gap-2">
+              <div key={log.id} className="bg-white border border-gray-200 rounded-md p-4 shadow-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 rounded">
+                    {log.status}
+                  </span>
+                  <div className="flex gap-2">
+                    {isMediabuyer && (
                       <button
-                        onClick={() => {
-                          setEditingLog(log);
-                          setEditedStatus(log.status);
-                          setEditedNotes(log.notes || "");
-                          setEditedSupportMemberName(log.support_member_name || "");
-                          setEditedAdminNotes(log.admin_notes || "");
-                          setEditedMediabuyerNotes(log.mediabuyer_notes || "");
-                          setEditPopupOpen(true);
-                        }}
-                        className="p-2 text-gray-400 hover:text-blue-600 rounded-md"
+                        onClick={() => openMediabuyerNotesPopup(log)}
+                        className={`p-2 ${
+                          log.mediabuyer_notes ? 'text-orange-600' : 'text-gray-400 hover:text-orange-600'
+                        }`}
+                        title={log.mediabuyer_notes ? "تعديل ملاحظات الميديا باير" : "إضافة ملاحظات الميديا باير"}
                       >
-                        <Edit className="h-4 w-4" />
+                        <StickyNote className="h-4 w-4" />
                       </button>
+                    )}
+                    {canEditLogs && (
+                      <>
+                        <button
+                          onClick={() => openEditPopup(log)}
+                          className="p-2 text-blue-500 hover:text-blue-700"
+                          title="تعديل السجل"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteCallLog(log.id)}
+                          className="p-2 text-red-500 hover:text-red-700"
+                          title="حذف السجل"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                    {isMediabuyer && log.mediabuyer_notes && (
                       <button
-                        onClick={() => deleteCallLog(log.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 rounded-md"
+                        onClick={() => deleteMediabuyerNotes(log.id)}
+                        className="p-2 text-red-400 hover:text-red-600"
+                        title="حذف ملاحظات الميديا باير"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-                
-                {/* Support Member Name - Visible to all roles except clients (all our system roles can see this) */}
+
                 {log.support_member_name && (
-                  <p className="mt-2 text-sm text-gray-700 flex items-start gap-2">
-                    <User className="h-4 w-4 text-green-500 mt-0.5" />
-                    <div>
-                      <strong className="text-green-700">اسم عضو الدعم:</strong> {log.support_member_name}
-                    </div>
-                  </p>
+                  <p className="text-sm text-gray-700"><strong>اسم عضو الدعم:</strong> {log.support_member_name}</p>
                 )}
-                
-                {/* General Notes - Visible to all */}
+                {log.mediabuyer_name && (
+                  <p className="text-sm text-orange-600"><strong> اسم الميديا باير:</strong> {log.mediabuyer_name}</p>
+                )}
                 {log.notes && (
-                  <p className="mt-2 text-sm text-gray-700 flex items-start gap-2">
-                    <StickyNote className="h-4 w-4 text-blue-500 mt-0.5" />
-                    <div>
-                      <strong className="text-blue-700">ملاحظات عامة:</strong> {log.notes}
-                    </div>
-                  </p>
+                  <p className="text-sm text-gray-700"><strong>ملاحظات:</strong> {log.notes}</p>
                 )}
-                
-                {/* Admin Notes - Only visible to admin */}
-                {log.admin_notes && shouldShowNote(log, 'admin_notes') && (
-                  <p className="mt-2 text-sm text-purple-700 flex items-start gap-2">
-                    <StickyNote className="h-4 w-4 text-purple-500 mt-0.5" />
-                    <div>
-                      <strong className="text-purple-700">ملاحظات المدير:</strong> {log.admin_notes}
-                    </div>
-                  </p>
+                {log.admin_notes && isAdmin && (
+                  <p className="text-sm text-purple-700"><strong>ملاحظات المدير:</strong> {log.admin_notes}</p>
                 )}
-                
-                {/* Mediabuyer Notes - Only visible to mediabuyer and customercare */}
-                {log.mediabuyer_notes && shouldShowNote(log, 'mediabuyer_notes') && (
-                  <p className="mt-2 text-sm text-orange-700 flex items-start gap-2">
-                    <StickyNote className="h-4 w-4 text-orange-500 mt-0.5" />
-                    <div>
-                      <strong className="text-orange-700">ملاحظات الوسيط:</strong> {log.mediabuyer_notes}
-                    </div>
-                  </p>
+                {log.mediabuyer_notes && (
+                  <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                    <p className="text-sm text-orange-800"><strong>ملاحظات الميديا باير:</strong> {log.mediabuyer_notes}</p>
+                    {log.editedBy && (
+                      <p className="text-xs text-orange-600 mt-1">تم التعديل بواسطة: {log.mediabuyer_name}</p>
+                    )}
+                  </div>
                 )}
-                
-                <div className="mt-2 text-xs text-gray-500 flex flex-wrap gap-4">
+
+                <div className="mt-2 text-xs text-gray-500 flex flex-wrap gap-x-6 gap-y-1">
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3" /> 
                     {formatDisplayDateTime(log.timestamp)}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {log.agentName || "غير معروف"}
-                  </span>
                   {log.created_by_role && (
-                    <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                      <span className="capitalize text-gray-600">
-                        {log.created_by_role === 'admin' ? 'مدير' : 
-                         log.created_by_role === 'mediabuyer' ? 'وسيط' : 
-                         log.created_by_role === 'customercare' ? 'خدمة عملاء' : log.created_by_role}
-                      </span>
+                    <span className="bg-gray-100 px-2 py-0.5 rounded text-xs capitalize">
+                      {log.created_by_role === 'admin' ? 'مدير' :
+                       log.created_by_role === 'mediabuyer' ? 'ميديا باير' :
+                       'خدمة عملاء'}
                     </span>
                   )}
                 </div>
@@ -1292,16 +1459,38 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
           )}
         </div>
 
-        {/* Footer */}
-        {canEditLogs && (
-          <div className="p-3 border-t border-gray-200 bg-gray-50 flex justify-end">
-            <button
-              onClick={() => setAddPopupOpen(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 inline mr-1" />
-              إضافة سجل جديد
-            </button>
+        {/* Footer Buttons */}
+        {(canEditLogs || isMediabuyer) && (
+          <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+            {canEditLogs && (
+              <button
+                onClick={() => setAddPopupOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
+              >
+                <Plus className="h-4 w-4" /> إضافة سجل جديد
+              </button>
+            )}
+            {isMediabuyer && (
+              <button
+                onClick={() => {
+                  setMediabuyerEditingLog({
+                    id: '',
+                    appointmentId: appointment.id,
+                    status: "ملاحظات الميديا باير",
+                    timestamp: createTimestamp(),
+                    support_member_name: username,
+                    timezone: getUserTimezone(),
+                    created_by_role: 'mediabuyer',
+                  });
+                  setMediabuyerNotes("");
+                  setEditedMediabuyerName(username);
+                  setMediabuyerNotesPopupOpen(true);
+                }}
+                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center gap-1"
+              >
+                <Plus className="h-4 w-4" /> إضافة ملاحظات ميديا باير
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1309,10 +1498,8 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
       {/* Add Popup */}
       {addPopupOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">إضافة سجل جديد</h3>
-            
-            <label className="block mb-2 text-sm font-medium">الحالة *</label>
             <select
               value={newCallLogStatus}
               onChange={(e) => setNewCallLogStatus(e.target.value)}
@@ -1320,72 +1507,57 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
               required
             >
               <option value="">اختر الحالة</option>
-              {callLogStatusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
+              {callLogStatusOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
-
-            <label className="block mb-2 text-sm font-medium">اسم عضو الدعم</label>
             <input
-              type="text"
+              placeholder="اسم عضو الدعم"
               value={newSupportMemberName}
               onChange={(e) => setNewSupportMemberName(e.target.value)}
-              placeholder="اسم عضو فريق الدعم"
               className="w-full mb-3 border rounded p-2"
             />
-
-            <label className="block mb-2 text-sm font-medium">ملاحظات عامة</label>
             <textarea
+              placeholder="ملاحظات عامة"
               value={newCallLogNotes}
               onChange={(e) => setNewCallLogNotes(e.target.value)}
               rows={2}
-              placeholder="ملاحظات عامة مرئية للجميع"
-              className="w-full border rounded p-2 mb-3"
+              className="w-full mb-3 border rounded p-2"
             />
-
-            {/* Admin Notes - Only show for admin users */}
             {isAdmin && (
-              <>
-                <label className="block mb-2 text-sm font-medium text-purple-700">ملاحظات المدير</label>
-                <textarea
-                  value={newAdminNotes}
-                  onChange={(e) => setNewAdminNotes(e.target.value)}
-                  rows={2}
-                  placeholder="ملاحظات خاصة بالإدارة فقط"
-                  className="w-full border border-purple-200 rounded p-2 mb-3"
-                />
-              </>
+              <textarea
+                placeholder="ملاحظات المدير"
+                value={newAdminNotes}
+                onChange={(e) => setNewAdminNotes(e.target.value)}
+                rows={2}
+                className="w-full mb-3 border border-purple-200 rounded p-2"
+              />
             )}
-
-            {/* Mediabuyer Notes - Only show for mediabuyer users */}
             {isMediabuyer && (
-              <>
-                <label className="block mb-2 text-sm font-medium text-orange-700">ملاحظات الوسيط</label>
-                <textarea
-                  value={newMediabuyerNotes}
-                  onChange={(e) => setNewMediabuyerNotes(e.target.value)}
-                  rows={2}
-                  placeholder="ملاحظات خاصة بالوسيط وخدمة العملاء"
-                  className="w-full border border-orange-200 rounded p-2 mb-3"
-                />
-              </>
+              <textarea
+                placeholder="ملاحظات الميديا باير"
+                value={newMediabuyerNotes}
+                onChange={(e) => setNewMediabuyerNotes(e.target.value)}
+                rows={2}
+                className="w-full mb-3 border border-orange-200 rounded p-2"
+              />
             )}
-
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setAddPopupOpen(false)}
-                className="px-4 py-2 bg-gray-100 rounded-md"
+                onClick={() => {
+                  setAddPopupOpen(false);
+                  resetAddForm();
+                }}
+                className="px-4 py-2 bg-gray-100 rounded"
               >
                 إلغاء
               </button>
               <button
                 onClick={addNewCallLog}
                 disabled={!newCallLogStatus || state.loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
               >
-                {state.loading ? "جاري الإضافة..." : "إضافة"}
+                {state.loading ? "جاري..." : "إضافة"}
               </button>
             </div>
           </div>
@@ -1395,78 +1567,129 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
       {/* Edit Popup */}
       {editPopupOpen && editingLog && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">تعديل السجل</h3>
-            
-            <label className="block mb-2 text-sm font-medium">الحالة *</label>
             <select
               value={editedStatus}
               onChange={(e) => setEditedStatus(e.target.value)}
               className="w-full mb-3 border rounded p-2"
-              required
             >
-              {callLogStatusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
+              {callLogStatusOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
-
-            <label className="block mb-2 text-sm font-medium">اسم عضو الدعم</label>
             <input
-              type="text"
               value={editedSupportMemberName}
               onChange={(e) => setEditedSupportMemberName(e.target.value)}
+              placeholder="اسم عضو الدعم"
               className="w-full mb-3 border rounded p-2"
             />
-
-            <label className="block mb-2 text-sm font-medium">ملاحظات عامة</label>
+            {isMediabuyer && (
+              <input
+                value={editedMediabuyerName}
+                onChange={(e) => setEditedMediabuyerName(e.target.value)}
+                placeholder="اسم الميديا باير"
+                className="w-full mb-3 border rounded p-2"
+              />
+            )}
             <textarea
               value={editedNotes}
               onChange={(e) => setEditedNotes(e.target.value)}
+              placeholder="ملاحظات عامة"
               rows={2}
-              className="w-full border rounded p-2 mb-3"
+              className="w-full mb-3 border rounded p-2"
             />
-
-            {/* Admin Notes - Only show for admin users */}
             {isAdmin && (
-              <>
-                <label className="block mb-2 text-sm font-medium text-purple-700">ملاحظات المدير</label>
-                <textarea
-                  value={editedAdminNotes}
-                  onChange={(e) => setEditedAdminNotes(e.target.value)}
-                  rows={2}
-                  className="w-full border border-purple-200 rounded p-2 mb-3"
-                />
-              </>
+              <textarea
+                value={editedAdminNotes}
+                onChange={(e) => setEditedAdminNotes(e.target.value)}
+                placeholder="ملاحظات المدير"
+                rows={2}
+                className="w-full mb-3 border border-purple-200 rounded p-2"
+              />
             )}
-
-            {/* Mediabuyer Notes - Only show for mediabuyer users */}
             {isMediabuyer && (
-              <>
-                <label className="block mb-2 text-sm font-medium text-orange-700">ملاحظات الوسيط</label>
-                <textarea
-                  value={editedMediabuyerNotes}
-                  onChange={(e) => setEditedMediabuyerNotes(e.target.value)}
-                  rows={2}
-                  className="w-full border border-orange-200 rounded p-2 mb-3"
-                />
-              </>
+              <textarea
+                value={editedMediabuyerNotes}
+                onChange={(e) => setEditedMediabuyerNotes(e.target.value)}
+                placeholder="ملاحظات الميديا باير"
+                rows={2}
+                className="w-full mb-3 border border-orange-200 rounded p-2"
+              />
             )}
-
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setEditPopupOpen(false)}
-                className="px-4 py-2 bg-gray-100 rounded-md"
+                onClick={() => {
+                  setEditPopupOpen(false);
+                  resetEditForm();
+                }}
+                className="px-4 py-2 bg-gray-100 rounded"
               >
                 إلغاء
               </button>
               <button
                 onClick={saveEditedLog}
                 disabled={state.loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
               >
-                {state.loading ? "جاري الحفظ..." : "حفظ"}
+                {state.loading ? "جاري..." : "حفظ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mediabuyer Notes Popup */}
+      {mediabuyerNotesPopupOpen && mediabuyerEditingLog && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 text-orange-700">ملاحظات الميديا باير</h3>
+
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">اسم الميديا باير</label>
+              <input
+                type="text"
+                value={editedMediabuyerName}
+                onChange={(e) => setEditedMediabuyerName(e.target.value)}
+                placeholder="أدخل اسم الميديا باير"
+                className="w-full border border-orange-300 rounded-md px-3 py-2 text-right"
+                dir="rtl"
+              />
+              {!isAdmin && (
+                <p className="text-xs text-orange-500 mt-1">* سيتم حفظ الملاحظات باسمك الحالي</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">الملاحظات</label>
+              <textarea
+                value={mediabuyerNotes}
+                onChange={(e) => setMediabuyerNotes(e.target.value)}
+                placeholder="أدخل ملاحظات الميديا باير..."
+                rows={4}
+                className="w-full border border-orange-200 rounded-md p-2 resize-none text-right"
+                dir="rtl"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setMediabuyerNotesPopupOpen(false);
+                  setMediabuyerEditingLog(null);
+                  setMediabuyerNotes("");
+                  setEditedMediabuyerName("");
+                }}
+                className="px-4 py-2 bg-gray-100 rounded"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={saveMediabuyerNotes}
+                disabled={state.loading}
+                className="px-4 py-2 bg-orange-600 text-white rounded disabled:opacity-50"
+              >
+                {state.loading ? "جاري..." : "حفظ"}
               </button>
             </div>
           </div>
@@ -1476,4 +1699,4 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
   );
 };
 
-export default DataTable;
+export default DataTable; // Fixed export name
