@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react"
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { 
   Calendar, 
   Clock, 
@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-} from "lucide-react"
+} from "lucide-react";
 
 // Date utility functions
 const formatDateTimeForMySQL = (date: Date): string => {
@@ -20,7 +20,7 @@ const formatDateTimeForMySQL = (date: Date): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
-const formatDisplayDateTime = (dateTime: string | Date): string => {
+const formatDisplayDateTime = (dateTime: string | Date | null): string => {
   if (!dateTime) return '-';
   const date = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
   if (isNaN(date.getTime())) return '-';
@@ -41,8 +41,54 @@ const getUserTimezone = (): string => {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
 
-// Updated CallLog interface
+const getTimezoneOffset = (): string => {
+  const offset = -new Date().getTimezoneOffset();
+  const hours = Math.floor(Math.abs(offset) / 60);
+  const minutes = Math.abs(offset) % 60;
+  const sign = offset >= 0 ? '+' : '-';
+  return `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};
 
+// Parse scheduledAt from database
+const parseScheduledAt = (scheduledAt: any): Date | null => {
+  if (!scheduledAt) return null;
+  
+  if (typeof scheduledAt === 'string') {
+    // Handle MySQL datetime format (YYYY-MM-DD HH:MM:SS)
+    if (scheduledAt.includes(' ')) {
+      const [datePart, timePart] = scheduledAt.split(' ');
+      const [year, month, day] = datePart.split('-');
+      const [hours, minutes, seconds] = timePart.split(':');
+      
+      // Create date in local timezone
+      return new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hours),
+        parseInt(minutes),
+        parseInt(seconds || '0')
+      );
+    }
+    
+    console.log("parsed ISO string", scheduledAt);
+    // Try to parse ISO string
+  const parsed = new Date(scheduledAt);
+if (!isNaN(parsed.getTime())) {
+  parsed.setHours(parsed.getHours() + 1); // ✅ add one hour
+  return parsed;
+}
+
+  }
+  
+  if (scheduledAt instanceof Date) {
+    return scheduledAt;
+  }
+  
+  return null;
+};
+
+// Interfaces
 interface CallLog {
   id: string;
   appointmentId: string;
@@ -59,8 +105,8 @@ interface CallLog {
 }
 
 interface FormField {
-  key: string
-  label?: string
+  key: string;
+  label?: string;
 }
 
 interface Appointment {
@@ -87,36 +133,36 @@ interface Appointment {
 }
 
 interface DataTableProps {
-  formFields?: FormField[]
-  data?: Appointment[]
-  onDelete?: (id: string) => void
-  onView?: (row: Appointment) => void
-  userRole: "customercare" | "mediabuyer" | "admin"
+  formFields?: FormField[];
+  data?: Appointment[];
+  onDelete?: (id: string) => void;
+  onView?: (row: Appointment) => void;
+  userRole: "customercare" | "mediabuyer" | "admin";
 }
 
 interface State {
-  search: string
-  branchFilter: string
-  paymentFilter: string
-  authFilter: string
-  statusFilter: string
-  loading: boolean
-  error: string | null
-  fetchedData: Appointment[]
-  selectedAppointment: Appointment | null
-  callLogDialogOpen: boolean
-  deleteConfirmOpen: boolean
-  appointmentToDelete: string | null
-  currentPage: number
-  totalPages: number
-  schedulePopupOpen: boolean
-  schedulingAppointment: Appointment | null
-  newScheduledDateTime: string
-  isScheduling: boolean
+  search: string;
+  branchFilter: string;
+  paymentFilter: string;
+  authFilter: string;
+  statusFilter: string;
+  loading: boolean;
+  error: string | null;
+  fetchedData: Appointment[];
+  selectedAppointment: Appointment | null;
+  callLogDialogOpen: boolean;
+  deleteConfirmOpen: boolean;
+  appointmentToDelete: string | null;
+  currentPage: number;
+  totalPages: number;
+  schedulePopupOpen: boolean;
+  schedulingAppointment: Appointment | null;
+  newScheduledDateTime: string;
+  isScheduling: boolean;
 }
 
 // Status options and colors
-const appointmentStatusOptions = ["pending", "confirmed", "completed", "cancelled"]
+const appointmentStatusOptions = ["pending", "confirmed", "completed", "cancelled"];
 
 const appointmentStatusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -158,7 +204,7 @@ const paymentStatusColors: Record<string, string> = {
   "paid": "bg-green-100 text-green-800 border-green-200",
   "pending": "bg-yellow-100 text-yellow-800 border-yellow-200",
   "unpaid": "bg-red-100 text-red-800 border-red-200",
-}
+};
 
 const defaultFormFields: FormField[] = [
   { key: "name", label: "الاسم" },
@@ -169,29 +215,29 @@ const defaultFormFields: FormField[] = [
   { key: "pageTitle", label: "عنوان الصفحة" },
   { key: "utmSource", label: "المصدر" },
   { key: "createdAt", label: "تاريخ الإنشاء" },
-]
+];
 
-const defaultData: Appointment[] = []
+const defaultData: Appointment[] = [];
 
 // API functions
 const deleteAppointment = async (id: string) => {
   try {
-    const token = sessionStorage.getItem("token")
+    const token = sessionStorage.getItem("token");
     const response = await fetch(`https://www.ss.mastersclinics.com/appointments/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
       },
-    })
+    });
     if (!response.ok) {
-      throw new Error("Failed to delete appointment")
+      throw new Error("Failed to delete appointment");
     }
-    return await response.json()
+    return await response.json();
   } catch (error) {
-    console.error("Error deleting appointment:", error)
-    throw error
+    console.error("Error deleting appointment:", error);
+    throw error;
   }
-}
+};
 
 const updateAppointments = async (id: string, data: Partial<Appointment>) => {
   console.log(`Updating appointment ${id} with data:`, data);
@@ -220,804 +266,19 @@ const updateAppointments = async (id: string, data: Partial<Appointment>) => {
 
 // Chip Component
 const Chip: React.FC<{
-  label: string
-  className?: string
-  size?: 'small' | 'medium'
+  label: string;
+  className?: string;
+  size?: 'small' | 'medium';
 }> = ({ label, className = "", size = 'small' }) => {
-  const sizeClass = size === 'small' ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'
+  const sizeClass = size === 'small' ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm';
   return (
     <span className={`inline-flex items-center rounded-full border font-medium ${sizeClass} ${className}`}>
       {label}
     </span>
-  )
-}
+  );
+};
 
-// DataTable Component
-const DataTable: React.FC<Partial<DataTableProps>> = ({
-  formFields = defaultFormFields,
-  data = defaultData,
-  userRole = "customercare",
-}) => {
-  const [state, setState] = useState<State>({
-    search: "",
-    branchFilter: "all",
-    paymentFilter: "all",
-    authFilter: "all",
-    statusFilter: "all",
-    loading: false,
-    error: null,
-    fetchedData: data,
-    selectedAppointment: null,
-    callLogDialogOpen: false,
-    deleteConfirmOpen: false,
-    appointmentToDelete: null,
-    currentPage: 1,
-    totalPages: 1,
-    schedulePopupOpen: false,
-    schedulingAppointment: null,
-    newScheduledDateTime: "",
-    isScheduling: false,
-  })
-
-  const {
-    search,
-    branchFilter,
-    paymentFilter,
-    authFilter,
-    statusFilter,
-    loading,
-    error,
-    fetchedData,
-    selectedAppointment,
-    callLogDialogOpen,
-    deleteConfirmOpen,
-    appointmentToDelete,
-    currentPage,
-    totalPages,
-    schedulePopupOpen,
-    schedulingAppointment,
-    newScheduledDateTime,
-    isScheduling,
-  } = state
-
-  const role = userRole || (sessionStorage.getItem("role") ?? "customercare")
-  const username = sessionStorage.getItem("username") || "غير معروف"
-
-  const canScheduleAppointments = role === "customercare"
-
-  const fetchWithToken = async (url: string, options: RequestInit = {}) => {
-    const token = sessionStorage.getItem("token")
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: token ? `Bearer ${token}` : "",
-        "Content-Type": "application/json",
-      },
-    })
-  }
-
-  const fetchData = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }))
-    try {
-      const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`)
-      if (!response.ok) throw new Error("Network error")
-      const data = await response.json();
-      console.log(data);
-    
-      setState((prev) => ({
-        ...prev,
-        fetchedData: data.appointments || [],
-        totalPages: data.totalPages || 1,
-        loading: false,
-      }))
-    } catch (err) {
-      setState((prev) => ({ ...prev, error: "فشل في تحميل البيانات", loading: false }))
-    }
-  }, [currentPage])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  const branchOptions = useMemo(() => {
-    const branches = (fetchedData || []).map((d) => d.branch).filter(Boolean)
-    return Array.from(new Set(branches))
-  }, [fetchedData])
-
-  const hasUtmSource = useMemo(() => {
-    return fetchedData.some((row) => !!row.utmSource)
-  }, [fetchedData])
-
-  const visibleFormFields = useMemo(() => {
-    if (role === "customercare" && !hasUtmSource) {
-      return formFields.filter((field) => field.key !== "utmSource")
-    }
-    return formFields
-  }, [formFields, role, hasUtmSource])
-
-  const deepSearch = (obj: any, searchTerm: string): boolean => {
-    if (!obj) return false
-    return Object.values(obj).some((val) => {
-      if (typeof val === "object" && val !== null) return deepSearch(val, searchTerm)
-      const stringValue = String(val ?? "").toLowerCase()
-      return stringValue.includes(searchTerm.toLowerCase())
-    })
-  }
-
-  const getLastCallStatus = (appointment: Appointment): CallLog | null => {
-    if (!appointment.callLogs || appointment.callLogs.length === 0) {
-      return null
-    }
-    const sortedLogs = [...appointment.callLogs].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    )
-    return sortedLogs[0]
-  }
-
-  const filteredData = useMemo(() => {
-    if (!fetchedData) return []
-    return fetchedData
-      .filter((row) => {
-        const matchesBranch = branchFilter === "all" || row.branch === branchFilter
-        const matchesSearch = search.trim() ? deepSearch(row, search) : true
-        const matchesPayment = paymentFilter === "all" || row.payment_status === paymentFilter
-        const matchesAuth = authFilter === "all" ||
-          (authFilter === "authed" && row.is_authed === 1) ||
-          (authFilter === "notAuthed" && row.is_authed === 0)
-        const matchesStatus = statusFilter === "all" || row.status === statusFilter
-        return matchesSearch && matchesBranch && matchesPayment && matchesAuth && matchesStatus
-      })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [search, branchFilter, paymentFilter, authFilter, statusFilter, fetchedData])
-
-  const handleChange = (field: keyof State) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setState((prev) => ({ ...prev, [field]: e.target.value }))
-  }
-
-  const handleSelectChange = (field: keyof State) => (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setState((prev) => ({ ...prev, [field]: e.target.value }))
-  }
-
-  const openCallLogDialog = (appointment: Appointment) => {
-    setState((prev) => ({
-      ...prev,
-      selectedAppointment: appointment,
-      callLogDialogOpen: true,
-    }))
-  }
-
-  const closeCallLogDialog = () => {
-    setState((prev) => ({
-      ...prev,
-      callLogDialogOpen: false,
-      selectedAppointment: null,
-    }))
-  }
-
-  const handleUpdateCallLogs = useCallback(async (appointmentId: string, callLogs: CallLog[]) => {
-    await updateAppointments(appointmentId, { callLogs })
-    await fetchData()
-    setState(prev => {
-      if (prev.selectedAppointment?.id === appointmentId) {
-        return {
-          ...prev,
-          selectedAppointment: {
-            ...prev.selectedAppointment,
-            callLogs
-          }
-        }
-      }
-      return prev
-    })
-  }, [fetchData])
-
-  const openSchedulePopup = (appointment: Appointment) => {
-    if (!canScheduleAppointments) {
-      setState((prev) => ({ ...prev, error: "غير مصرح لك بتحديد المواعيد" }))
-      return
-    }
-    let initialDate = new Date()
-    if (appointment.scheduledAt) {
-      initialDate = new Date(appointment.scheduledAt)
-    }
-    const formattedDate = initialDate.toISOString().slice(0, 16)
-    setState((prev) => ({
-      ...prev,
-      schedulePopupOpen: true,
-      schedulingAppointment: appointment,
-      newScheduledDateTime: formattedDate,
-    }))
-  }
-
-  const closeSchedulePopup = () => {
-    setState((prev) => ({
-      ...prev,
-      schedulePopupOpen: false,
-      schedulingAppointment: null,
-      newScheduledDateTime: "",
-      isScheduling: false,
-    }))
-  }
-
-  // Updated scheduleAppointment function
-  const scheduleAppointment = useCallback(async () => {
-    if (!schedulingAppointment || !newScheduledDateTime) return
-    setState((prev) => ({ ...prev, isScheduling: true, error: null }))
-    try {
-      const scheduledDate = new Date(newScheduledDateTime)
-      const mysqlDateTime = formatDateTimeForMySQL(scheduledDate)
-      
-      const schedulingLog: CallLog = {
-        id: `schedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        appointmentId: schedulingAppointment.id,
-        timestamp: createTimestamp(),
-        status: "تم الحجز",
-        notes: `تم تحديد موعد الحجز: ${formatDisplayDateTime(mysqlDateTime)}`,
-        support_member_name: username || "غير معروف", // Changed from agentName
-        timezone: getUserTimezone(),
-        created_by_role: role as any,
-      };
-
-      const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog]
-      await updateAppointments(schedulingAppointment.id, {
-        scheduledAt: mysqlDateTime,
-        callLogs: updatedLogs,
-      })
-      await fetchData()
-      closeSchedulePopup()
-    } catch (err: any) {
-      console.error("[ERROR] Scheduling failed:", err)
-      setState((prev) => ({
-        ...prev,
-        error: err.message || "فشل في تحديد الموعد",
-      }))
-    } finally {
-      setState((prev) => ({ ...prev, isScheduling: false }))
-    }
-  }, [schedulingAppointment, newScheduledDateTime, username, role, fetchData])
-
-  // Updated unscheduleAppointment function
-  const unscheduleAppointment = useCallback(async () => {
-    if (!schedulingAppointment) return
-    setState((prev) => ({ ...prev, isScheduling: true, error: null }))
-    try {
-      const unschedulingLog: CallLog = {
-        id: `unschedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        appointmentId: schedulingAppointment.id,
-        timestamp: createTimestamp(),
-        status: "تم إلغاء الحجز",
-        notes: "تم إلغاء موعد الحجز",
-        support_member_name: username || "غير معروف", // Changed from agentName
-        timezone: getUserTimezone(),
-        created_by_role: role as any,
-      };
-
-      const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog]
-      await updateAppointments(schedulingAppointment.id, {
-        scheduledAt: null,
-        callLogs: updatedLogs,
-      })
-      await fetchData()
-      closeSchedulePopup()
-    } catch (err: any) {
-      setState((prev) => ({
-        ...prev,
-        error: err.message || "فشل في إلغاء الموعد",
-      }))
-    } finally {
-      setState((prev) => ({ ...prev, isScheduling: false }))
-    }
-  }, [schedulingAppointment, username, role, fetchData])
-
-  const openDeleteConfirm = (appointmentId: string) => {
-    setState((prev) => ({
-      ...prev,
-      deleteConfirmOpen: true,
-      appointmentToDelete: appointmentId,
-    }))
-  }
-
-  const closeDeleteConfirm = () => {
-    setState((prev) => ({
-      ...prev,
-      deleteConfirmOpen: false,
-      appointmentToDelete: null,
-    }))
-  }
-
-  const confirmDeleteAppointment = async () => {
-    if (!appointmentToDelete) return
-    try {
-      await deleteAppointment(appointmentToDelete)
-      await fetchData()
-      closeDeleteConfirm()
-    } catch (err) {
-      console.error("Failed to delete appointment:", err)
-      setState((prev) => ({
-        ...prev,
-        error: "فشل في حذف الموعد",
-        deleteConfirmOpen: false,
-        appointmentToDelete: null,
-      }))
-    }
-  }
-
-  const updateAppointmentStatus = async (id: string, status: string) => {
-    try {
-      await updateAppointments(id, { status })
-      await fetchData()
-    } catch (err) {
-      console.error("Failed to update appointment status:", err)
-      setState((prev) => ({
-        ...prev,
-        error: "فشل في تحديث حالة الموعد",
-      }))
-    }
-  }
-
-  const renderDoctorOffer = (row: Appointment) => (
-    <div className="flex flex-col gap-1 text-sm">
-      {row.type === "device" && row.device && (
-        <div className="font-medium text-green-700">جهاز: {row.device}</div>
-      )}
-      {row.type === "doctor" && row.doctor && (
-        <div className="font-medium text-blue-700">طبيب: {row.doctor}</div>
-      )}
-      {row.type === "offer" && row.offer && (
-        <div className="font-medium text-purple-700">عرض: {row.offer}</div>
-      )}
-      {row.type === "branch" && (
-        <div className="font-medium text-gray-700">فرع: {row.branch}</div>
-      )}
-      {row.type !== "device" && row.device && (
-        <div className="text-xs text-gray-500">جهاز: {row.device}</div>
-      )}
-      {row.type !== "doctor" && row.doctor && (
-        <div className="text-xs text-gray-500">طبيب: {row.doctor}</div>
-      )}
-      {row.type !== "offer" && row.offer && (
-        <div className="text-xs text-gray-500">عرض: {row.offer}</div>
-      )}
-      {!row.device && !row.doctor && !row.offer && "-"}
-    </div>
-  )
-
-  const renderScheduledAt = (scheduledAt: string | null | undefined) => {
-    if (!scheduledAt) return "-"
-    return formatDisplayDateTime(scheduledAt)
-  }
-
-  const handlePaginationClick = useCallback(
-    (direction: "prev" | "next") => (event: React.MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      setState((prev) => ({
-        ...prev,
-        currentPage: direction === "prev" ? prev.currentPage - 1 : prev.currentPage + 1,
-      }))
-    },
-    [setState],
-  )
-
-  return (
-    <div className="overflow-auto pr-2 bg-gray-50 min-h-screen p-2">
-      {error && (
-        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
-          <div className="flex justify-between items-start">
-            <div className="flex">
-              <AlertTriangle className="h-5 w-5 mr-2 mt-0.5" />
-              <span>{error}</span>
-            </div>
-            <button 
-              onClick={() => setState((prev) => ({ ...prev, error: null }))}
-              className="text-red-500 hover:text-red-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border">
-        <div className="flex flex-wrap gap-4">
-          <div className="relative flex-1 min-w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="بحث في المواعيد..."
-              value={search}
-              onChange={handleChange("search")}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          
-          <select
-            value={branchFilter}
-            onChange={handleSelectChange("branchFilter")}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">جميع الفروع</option>
-            {branchOptions.map((branch) => (
-              <option key={branch} value={branch}>
-                {branch}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={paymentFilter}
-            onChange={handleSelectChange("paymentFilter")}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">جميع حالات الدفع</option>
-            <option value="paid">مدفوع</option>
-            <option value="pending">معلق</option>
-            <option value="unpaid">غير مدفوع</option>
-          </select>
-
-          <select
-            value={authFilter}
-            onChange={handleSelectChange("authFilter")}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">جميع حالات التوثيق</option>
-            <option value="authed">موثق</option>
-            <option value="notAuthed">غير موثق</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={handleSelectChange("statusFilter")}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">جميع الحالات</option>
-            {appointmentStatusOptions.map((status) => (
-              <option key={status} value={status}>
-                {appointmentStatusLabels[status]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto max-h-[75vh]">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b sticky top-0 z-10">
-              <tr>
-                {visibleFormFields.map((field) => (
-                  <th key={field.key} className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                    {field.label}
-                  </th>
-                ))}
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">حالة الدفع</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">التوثيق</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">الحالة</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">موعد الحجز</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">آخر حالة</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">سجلات الاتصال</th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading && (
-                <tr>
-                  <td colSpan={visibleFormFields.length + 7} className="px-6 py-12 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="text-gray-600">جاري التحميل...</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {!loading && filteredData.length === 0 && (
-                <tr>
-                  <td colSpan={visibleFormFields.length + 7} className="px-6 py-12 text-center">
-                    <div className="text-gray-500">لا توجد بيانات</div>
-                  </td>
-                </tr>
-              )}
-              {filteredData.map((row) => {
-                const lastCall = getLastCallStatus(row)
-                return (
-                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                    {visibleFormFields.map((field) => (
-                      <td key={field.key} className="px-6 py-4 text-sm text-gray-900">
-                        {field.key === "createdAt"
-                          ? formatDisplayDateTime(row[field.key])
-                          : field.key === "doctor_offer"
-                            ? renderDoctorOffer(row)
-                            : (row[field.key] ?? "-")}
-                      </td>
-                    ))}
-                    <td className="px-6 py-4">
-                      <Chip
-                        label={row.payment_status === "paid" ? "مدفوع" : row.payment_status === "pending" ? "معلق" : "غير مدفوع"}
-                        className={paymentStatusColors[row.payment_status] || "bg-gray-100 text-gray-800"}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${row.is_authed ? 'bg-green-500' : 'bg-red-500'}`}>
-                        {row.is_authed ? '✓' : '✗'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      
-                      {userRole === "customercare" && (row.is_authed === 1) ? (
-                        <select
-                          value={row.status}
-                          onChange={(e) => updateAppointmentStatus(row.id, e.target.value)}
-      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-    >
-      {appointmentStatusOptions.map((status) => (
-        <option key={status} value={status}>
-          {appointmentStatusLabels[status]}
-        </option>
-      ))}
-    </select>
-  ) : (
-    <Chip
-      label={appointmentStatusLabels[row.status] || row.status}
-      className={
-        appointmentStatusColors[row.status] ||
-        "bg-gray-100 text-gray-800"
-      }
-    />
-  )}
-</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900">
-                            {renderScheduledAt(row.scheduledAt)}
-                          </div>
-                          {row.scheduledAt && (
-                            <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                              <Clock className="h-3 w-3" />
-                              المنطقة: {getUserTimezone()}
-                            </div>
-                          )}
-                        </div>
-                        {(canScheduleAppointments && row.is_authed) ? (
-                          <button
-                            onClick={() => openSchedulePopup(row)}
-                            className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${row.scheduledAt ? 'text-blue-600' : 'text-gray-400'}`}
-                            title={row.scheduledAt ? "تعديل الموعد" : "تحديد موعد"}
-                          >
-                            <Calendar className="h-4 w-4" />
-                          </button>
-                        ) : "-"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {lastCall ? (
-                        <div className="group relative">
-                          <Chip
-                            label={lastCall.status}
-                            className={statusColors[lastCall.status] || "bg-gray-100 text-gray-800 border-gray-200"}
-                          />
-                          <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                            <div className="font-medium">{formatDisplayDateTime(lastCall.timestamp)}</div>
-                            <div className="mt-1">بواسطة: {lastCall.support_member_name || 'غير معروف'}</div>
-                            {lastCall.notes && (
-                              <div className="mt-1">ملاحظة: {lastCall.notes}</div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <Chip label="لا يوجد" className="bg-gray-100 text-gray-800 border-gray-200" />
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => openCallLogDialog(row)}
-                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-md hover:bg-blue-200 transition-colors"
-                      >
-                        <History className="h-4 w-4" />
-                        السجلات ({row.callLogs?.length || 0})
-                      </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      {role === "mediabuyer" && (
-                        <button
-                          onClick={() => openDeleteConfirm(row.id)}
-                          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-200 rounded-md hover:bg-red-200 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          حذف
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pagination */}
-      <div className="mt-6 flex justify-center items-center gap-4">
-        <button
-          onClick={handlePaginationClick("prev")}
-          disabled={currentPage === 1 || loading}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          الصفحة السابقة
-        </button>
-        <span className="text-sm text-gray-600">
-          الصفحة {currentPage} من {totalPages}
-        </span>
-        <button
-          onClick={handlePaginationClick("next")}
-          disabled={currentPage === totalPages || loading}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          الصفحة التالية
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Call Log Dialog */}
-      {callLogDialogOpen && selectedAppointment && (
-        <CallLogManager
-          open={callLogDialogOpen}
-          onClose={closeCallLogDialog}
-          appointment={selectedAppointment}
-          onUpdateCallLogs={handleUpdateCallLogs}
-          userRole={role as any}
-          username={username}
-        />
-      )}
-
-      {/* Schedule Popup */}
-      {schedulePopupOpen && schedulingAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  تحديد موعد الحجز
-                </h3>
-                <button
-                  onClick={closeSchedulePopup}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <div className="mb-4 p-3 bg-gray-50 rounded-md">
-                <div className="text-sm text-gray-600">
-                  {schedulingAppointment.name} - {schedulingAppointment.phone}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  المنطقة الزمنية الحالية: <strong>{getUserTimezone()}</strong>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  تاريخ ووقت الموعد
-                </label>
-                <input
-                  type="datetime-local"
-                  value={newScheduledDateTime}
-                  onChange={(e) => setState(prev => ({ ...prev, newScheduledDateTime: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  سيتم حفظ الموعد بالمنطقة الزمنية المحلية
-                </p>
-              </div>
-
-              <div className="flex justify-between items-center gap-3">
-                {schedulingAppointment.scheduledAt && (
-                  <button
-                    onClick={unscheduleAppointment}
-                    disabled={isScheduling}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-200 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {isScheduling ? "جاري الإلغاء..." : "إلغاء الموعد"}
-                  </button>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={closeSchedulePopup}
-                    disabled={isScheduling}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={scheduleAppointment}
-                    disabled={isScheduling || !newScheduledDateTime}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isScheduling ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <Calendar className="h-4 w-4" />
-                    )}
-                    {isScheduling ? "جاري الحفظ..." : "حفظ الموعد"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      {deleteConfirmOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">تأكيد الحذف</h3>
-              </div>
-              
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  هل أنت متأكد أنك تريد حذف هذا الموعد؟ هذا الإجراء لا يمكن التراجع عنه.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={closeDeleteConfirm}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md"
-                >
-                  إلغاء
-                </button>
-                <button
-                  onClick={confirmDeleteAppointment}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
-                >
-                  حذف
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-// Types
-interface Appointment {
-  id: string;
-  name: string;
-  phone: string;
-  callLogs?: CallLog[];
-}
-
-interface CallLog {
-  id: string;
-  appointmentId: string;
-  timestamp: string;
-  status: string;
-  notes?: string | null;
-  support_member_name?: string | null;
-  mediabuyer_name?: string | null;
-  admin_notes?: string | null;
-  mediabuyer_notes?: string | null;
-  timezone?: string;
-  created_by_role?: "customercare" | "mediabuyer" | "admin";
-  editedBy?: string;
-}
-
+// CallLogManager Component
 interface CallLogManagerProps {
   open: boolean;
   onClose: () => void;
@@ -1699,4 +960,790 @@ const CallLogManager: React.FC<CallLogManagerProps> = ({
   );
 };
 
-export default DataTable; // Fixed export name
+// DataTable Component
+const DataTable: React.FC<Partial<DataTableProps>> = ({
+  formFields = defaultFormFields,
+  data = defaultData,
+  userRole = "customercare",
+}) => {
+  const [state, setState] = useState<State>({
+    search: "",
+    branchFilter: "all",
+    paymentFilter: "all",
+    authFilter: "all",
+    statusFilter: "all",
+    loading: false,
+    error: null,
+    fetchedData: data,
+    selectedAppointment: null,
+    callLogDialogOpen: false,
+    deleteConfirmOpen: false,
+    appointmentToDelete: null,
+    currentPage: 1,
+    totalPages: 1,
+    schedulePopupOpen: false,
+    schedulingAppointment: null,
+    newScheduledDateTime: "",
+    isScheduling: false,
+  });
+
+  const {
+    search,
+    branchFilter,
+    paymentFilter,
+    authFilter,
+    statusFilter,
+    loading,
+    error,
+    fetchedData,
+    selectedAppointment,
+    callLogDialogOpen,
+    deleteConfirmOpen,
+    appointmentToDelete,
+    currentPage,
+    totalPages,
+    schedulePopupOpen,
+    schedulingAppointment,
+    newScheduledDateTime,
+    isScheduling,
+  } = state;
+
+  const role = userRole || (sessionStorage.getItem("role") ?? "customercare");
+  const username = sessionStorage.getItem("username") || "غير معروف";
+
+  const canScheduleAppointments = role === "customercare";
+
+  const fetchWithToken = async (url: string, options: RequestInit = {}) => {
+    const token = sessionStorage.getItem("token");
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: token ? `Bearer ${token}` : "",
+        "Content-Type": "application/json",
+      },
+    });
+  };
+
+  const fetchData = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const response = await fetchWithToken(`https://www.ss.mastersclinics.com/appointments?page=${currentPage}`);
+      if (!response.ok) throw new Error("Network error");
+      const data = await response.json();
+    console.log(data);
+
+      setState((prev) => ({
+        ...prev,
+        fetchedData: data.appointments || [],
+        totalPages: data.totalPages || 1,
+        loading: false,
+      }));
+    } catch (err) {
+      setState((prev) => ({ ...prev, error: "فشل في تحميل البيانات", loading: false }));
+    }
+  }, [currentPage]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const branchOptions = useMemo(() => {
+    const branches = (fetchedData || []).map((d) => d.branch).filter(Boolean);
+    return Array.from(new Set(branches));
+  }, [fetchedData]);
+
+  const hasUtmSource = useMemo(() => {
+    return fetchedData.some((row) => !!row.utmSource);
+  }, [fetchedData]);
+
+  const visibleFormFields = useMemo(() => {
+    if (role === "customercare" && !hasUtmSource) {
+      return formFields.filter((field) => field.key !== "utmSource");
+    }
+    return formFields;
+  }, [formFields, role, hasUtmSource]);
+
+  const deepSearch = (obj: any, searchTerm: string): boolean => {
+    if (!obj) return false;
+    return Object.values(obj).some((val) => {
+      if (typeof val === "object" && val !== null) return deepSearch(val, searchTerm);
+      const stringValue = String(val ?? "").toLowerCase();
+      return stringValue.includes(searchTerm.toLowerCase());
+    });
+  };
+
+  const getLastCallStatus = (appointment: Appointment): CallLog | null => {
+    if (!appointment.callLogs || appointment.callLogs.length === 0) {
+      return null;
+    }
+    const sortedLogs = [...appointment.callLogs].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+    return sortedLogs[0];
+  };
+
+  const filteredData = useMemo(() => {
+    if (!fetchedData) return [];
+    return fetchedData
+      .filter((row) => {
+        const matchesBranch = branchFilter === "all" || row.branch === branchFilter;
+        const matchesSearch = search.trim() ? deepSearch(row, search) : true;
+        const matchesPayment = paymentFilter === "all" || row.payment_status === paymentFilter;
+        const matchesAuth = authFilter === "all" ||
+          (authFilter === "authed" && row.is_authed === 1) ||
+          (authFilter === "notAuthed" && row.is_authed === 0);
+        const matchesStatus = statusFilter === "all" || row.status === statusFilter;
+        return matchesSearch && matchesBranch && matchesPayment && matchesAuth && matchesStatus;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [search, branchFilter, paymentFilter, authFilter, statusFilter, fetchedData]);
+
+  const handleChange = (field: keyof State) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setState((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleSelectChange = (field: keyof State) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setState((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const openCallLogDialog = (appointment: Appointment) => {
+    setState((prev) => ({
+      ...prev,
+      selectedAppointment: appointment,
+      callLogDialogOpen: true,
+    }));
+  };
+
+  const closeCallLogDialog = () => {
+    setState((prev) => ({
+      ...prev,
+      callLogDialogOpen: false,
+      selectedAppointment: null,
+    }));
+  };
+
+  const handleUpdateCallLogs = useCallback(async (appointmentId: string, callLogs: CallLog[]) => {
+    await updateAppointments(appointmentId, { callLogs });
+    await fetchData();
+    setState(prev => {
+      if (prev.selectedAppointment?.id === appointmentId) {
+        return {
+          ...prev,
+          selectedAppointment: {
+            ...prev.selectedAppointment,
+            callLogs
+          }
+        };
+      }
+      return prev;
+    });
+  }, [fetchData]);
+
+  const openSchedulePopup = (appointment: Appointment) => {
+    if (!canScheduleAppointments) {
+      setState((prev) => ({ ...prev, error: "غير مصرح لك بتحديد المواعيد" }));
+      return;
+    }
+    let initialDate = new Date();
+    if (appointment.scheduledAt) {
+      const parsedDate = parseScheduledAt(appointment.scheduledAt);
+      if (parsedDate) initialDate = parsedDate;
+    }
+    const formattedDate = initialDate.toISOString().slice(0, 16);
+    setState((prev) => ({
+      ...prev,
+      schedulePopupOpen: true,
+      schedulingAppointment: appointment,
+      newScheduledDateTime: formattedDate,
+    }));
+  };
+
+  const closeSchedulePopup = () => {
+    setState((prev) => ({
+      ...prev,
+      schedulePopupOpen: false,
+      schedulingAppointment: null,
+      newScheduledDateTime: "",
+      isScheduling: false,
+    }));
+  };
+
+  const scheduleAppointment = useCallback(async () => {
+    if (!schedulingAppointment || !newScheduledDateTime) return;
+    setState((prev) => ({ ...prev, isScheduling: true, error: null }));
+    
+    try {
+      const scheduledDate = new Date(newScheduledDateTime);
+      
+      // Convert to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
+      const mysqlDateTime = formatDateTimeForMySQL(scheduledDate);
+      
+      const schedulingLog: CallLog = {
+        id: `schedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        appointmentId: schedulingAppointment.id,
+        timestamp: createTimestamp(),
+        status: "تم الحجز",
+        notes: `تم تحديد موعد الحجز: ${formatDisplayDateTime(scheduledDate)}`,
+        support_member_name: username || "غير معروف",
+        timezone: getUserTimezone(),
+        created_by_role: role as any,
+      };
+
+      const updatedLogs = [...(schedulingAppointment.callLogs || []), schedulingLog];
+      
+      // Update the appointment with the scheduled datetime
+      await updateAppointments(schedulingAppointment.id, {
+        scheduledAt: mysqlDateTime,
+        callLogs: updatedLogs,
+      });
+      
+      await fetchData();
+      closeSchedulePopup();
+    } catch (err: any) {
+      console.error("[ERROR] Scheduling failed:", err);
+      setState((prev) => ({
+        ...prev,
+        error: err.message || "فشل في تحديد الموعد",
+      }));
+    } finally {
+      setState((prev) => ({ ...prev, isScheduling: false }));
+    }
+  }, [schedulingAppointment, newScheduledDateTime, username, role, fetchData]);
+
+  const unscheduleAppointment = useCallback(async () => {
+    if (!schedulingAppointment) return;
+    setState((prev) => ({ ...prev, isScheduling: true, error: null }));
+    try {
+      const unschedulingLog: CallLog = {
+        id: `unschedule_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        appointmentId: schedulingAppointment.id,
+        timestamp: createTimestamp(),
+        status: "تم إلغاء الحجز",
+        notes: "تم إلغاء موعد الحجز",
+        support_member_name: username || "غير معروف",
+        timezone: getUserTimezone(),
+        created_by_role: role as any,
+      };
+
+      const updatedLogs = [...(schedulingAppointment.callLogs || []), unschedulingLog];
+      
+      // Set scheduledAt to null when unscheduling
+      await updateAppointments(schedulingAppointment.id, {
+        scheduledAt: null,
+        callLogs: updatedLogs,
+      });
+      
+      await fetchData();
+      closeSchedulePopup();
+    } catch (err: any) {
+      setState((prev) => ({
+        ...prev,
+        error: err.message || "فشل في إلغاء الموعد",
+      }));
+    } finally {
+      setState((prev) => ({ ...prev, isScheduling: false }));
+    }
+  }, [schedulingAppointment, username, role, fetchData]);
+
+  const openDeleteConfirm = (appointmentId: string) => {
+    setState((prev) => ({
+      ...prev,
+      deleteConfirmOpen: true,
+      appointmentToDelete: appointmentId,
+    }));
+  };
+
+  const closeDeleteConfirm = () => {
+    setState((prev) => ({
+      ...prev,
+      deleteConfirmOpen: false,
+      appointmentToDelete: null,
+    }));
+  };
+
+  const confirmDeleteAppointment = async () => {
+    if (!appointmentToDelete) return;
+    try {
+      await deleteAppointment(appointmentToDelete);
+      await fetchData();
+      closeDeleteConfirm();
+    } catch (err) {
+      console.error("Failed to delete appointment:", err);
+      setState((prev) => ({
+        ...prev,
+        error: "فشل في حذف الموعد",
+        deleteConfirmOpen: false,
+        appointmentToDelete: null,
+      }));
+    }
+  };
+
+  const updateAppointmentStatus = async (id: string, status: string) => {
+    try {
+      await updateAppointments(id, { status });
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to update appointment status:", err);
+      setState((prev) => ({
+        ...prev,
+        error: "فشل في تحديث حالة الموعد",
+      }));
+    }
+  };
+
+  const renderDoctorOffer = (row: Appointment) => (
+    <div className="flex flex-col gap-1 text-sm">
+      {row.type === "device" && row.device && (
+        <div className="font-medium text-green-700">جهاز: {row.device}</div>
+      )}
+      {row.type === "doctor" && row.doctor && (
+        <div className="font-medium text-blue-700">طبيب: {row.doctor}</div>
+      )}
+      {row.type === "offer" && row.offer && (
+        <div className="font-medium text-purple-700">عرض: {row.offer}</div>
+      )}
+      {row.type === "branch" && (
+        <div className="font-medium text-gray-700">فرع: {row.branch}</div>
+      )}
+      {row.type !== "device" && row.device && (
+        <div className="text-xs text-gray-500">جهاز: {row.device}</div>
+      )}
+      {row.type !== "doctor" && row.doctor && (
+        <div className="text-xs text-gray-500">طبيب: {row.doctor}</div>
+      )}
+      {row.type !== "offer" && row.offer && (
+        <div className="text-xs text-gray-500">عرض: {row.offer}</div>
+      )}
+      {!row.device && !row.doctor && !row.offer && "-"}
+    </div>
+  );
+
+  const renderScheduledAt = (scheduledAt: string | Date | null | undefined) => {
+    if (!scheduledAt) return "-";
+    
+    const date = parseScheduledAt(scheduledAt);
+    if (!date || isNaN(date.getTime())) return "-";
+    
+    return formatDisplayDateTime(date);
+  };
+
+  const handlePaginationClick = useCallback(
+    (direction: "prev" | "next") => (event: React.MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setState((prev) => ({
+        ...prev,
+        currentPage: direction === "prev" ? prev.currentPage - 1 : prev.currentPage + 1,
+      }));
+    },
+    [setState],
+  );
+
+  return (
+    <div className="overflow-auto pr-2 bg-gray-50 min-h-screen p-2">
+      {error && (
+        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
+          <div className="flex justify-between items-start">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 mr-2 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            <button 
+              onClick={() => setState((prev) => ({ ...prev, error: null }))}
+              className="text-red-500 hover:text-red-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border">
+        <div className="flex flex-wrap gap-4">
+          <div className="relative flex-1 min-w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="بحث في المواعيد..."
+              value={search}
+              onChange={handleChange("search")}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
+          <select
+            value={branchFilter}
+            onChange={handleSelectChange("branchFilter")}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">جميع الفروع</option>
+            {branchOptions.map((branch) => (
+              <option key={branch} value={branch}>
+                {branch}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={paymentFilter}
+            onChange={handleSelectChange("paymentFilter")}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">جميع حالات الدفع</option>
+            <option value="paid">مدفوع</option>
+            <option value="pending">معلق</option>
+            <option value="unpaid">غير مدفوع</option>
+          </select>
+
+          <select
+            value={authFilter}
+            onChange={handleSelectChange("authFilter")}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">جميع حالات التوثيق</option>
+            <option value="authed">موثق</option>
+            <option value="notAuthed">غير موثق</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={handleSelectChange("statusFilter")}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">جميع الحالات</option>
+            {appointmentStatusOptions.map((status) => (
+              <option key={status} value={status}>
+                {appointmentStatusLabels[status]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="overflow-x-auto max-h-[75vh]">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b sticky top-0 z-10">
+              <tr>
+                {visibleFormFields.map((field) => (
+                  <th key={field.key} className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                    {field.label}
+                  </th>
+                ))}
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">حالة الدفع</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">التوثيق</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">الحالة</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">موعد الحجز</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">آخر حالة</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">سجلات الاتصال</th>
+                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {loading && (
+                <tr>
+                  <td colSpan={visibleFormFields.length + 7} className="px-6 py-12 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <span className="text-gray-600">جاري التحميل...</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredData.length === 0 && (
+                <tr>
+                  <td colSpan={visibleFormFields.length + 7} className="px-6 py-12 text-center">
+                    <div className="text-gray-500">لا توجد بيانات</div>
+                  </td>
+                </tr>
+              )}
+              {filteredData.map((row) => {
+                const lastCall = getLastCallStatus(row);
+                return (
+                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                    {visibleFormFields.map((field) => (
+                      <td key={field.key} className="px-6 py-4 text-sm text-gray-900">
+                        {field.key === "createdAt"
+                          ? formatDisplayDateTime(row[field.key])
+                          : field.key === "doctor_offer"
+                            ? renderDoctorOffer(row)
+                            : (row[field.key] ?? "-")}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4">
+                      <Chip
+                        label={row.payment_status === "paid" ? "مدفوع" : row.payment_status === "pending" ? "معلق" : "غير مدفوع"}
+                        className={paymentStatusColors[row.payment_status] || "bg-gray-100 text-gray-800"}
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${row.is_authed ? 'bg-green-500' : 'bg-red-500'}`}>
+                        {row.is_authed ? '✓' : '✗'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {userRole === "customercare" && (row.is_authed === 1) ? (
+                        <select
+                          value={row.status}
+                          onChange={(e) => updateAppointmentStatus(row.id, e.target.value)}
+                          className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          {appointmentStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {appointmentStatusLabels[status]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Chip
+                          label={appointmentStatusLabels[row.status] || row.status}
+                          className={
+                            appointmentStatusColors[row.status] ||
+                            "bg-gray-100 text-gray-800"
+                          }
+                        />
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {renderScheduledAt(row.scheduledAt)}
+                          </div>
+                          {row.scheduledAt && (
+                            <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                              <Clock className="h-3 w-3" />
+                              المنطقة: {getUserTimezone()} ({getTimezoneOffset()})
+                            </div>
+                          )}
+                        </div>
+                        {(canScheduleAppointments && row.is_authed) ? (
+                          <button
+                            onClick={() => openSchedulePopup(row)}
+                            className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${row.scheduledAt ? 'text-blue-600' : 'text-gray-400'}`}
+                            title={row.scheduledAt ? "تعديل الموعد" : "تحديد موعد"}
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </button>
+                        ) : "-"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {lastCall ? (
+                        <div className="group relative">
+                          <Chip
+                            label={lastCall.status}
+                            className={statusColors[lastCall.status] || "bg-gray-100 text-gray-800 border-gray-200"}
+                          />
+                          <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                            <div className="font-medium">{formatDisplayDateTime(lastCall.timestamp)}</div>
+                            <div className="mt-1">بواسطة: {lastCall.support_member_name || 'غير معروف'}</div>
+                            {lastCall.notes && (
+                              <div className="mt-1">ملاحظة: {lastCall.notes}</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <Chip label="لا يوجد" className="bg-gray-100 text-gray-800 border-gray-200" />
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => openCallLogDialog(row)}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-md hover:bg-blue-200 transition-colors"
+                      >
+                        <History className="h-4 w-4" />
+                        السجلات ({row.callLogs?.length || 0})
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      {role === "mediabuyer" && (
+                        <button
+                          onClick={() => openDeleteConfirm(row.id)}
+                          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-200 rounded-md hover:bg-red-200 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          حذف
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      <div className="mt-6 flex justify-center items-center gap-4">
+        <button
+          onClick={handlePaginationClick("prev")}
+          disabled={currentPage === 1 || loading}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          الصفحة السابقة
+        </button>
+        <span className="text-sm text-gray-600">
+          الصفحة {currentPage} من {totalPages}
+        </span>
+        <button
+          onClick={handlePaginationClick("next")}
+          disabled={currentPage === totalPages || loading}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          الصفحة التالية
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Call Log Dialog */}
+      {callLogDialogOpen && selectedAppointment && (
+        <CallLogManager
+          open={callLogDialogOpen}
+          onClose={closeCallLogDialog}
+          appointment={selectedAppointment}
+          onUpdateCallLogs={handleUpdateCallLogs}
+          userRole={role as any}
+          username={username}
+        />
+      )}
+
+      {/* Schedule Popup */}
+      {schedulePopupOpen && schedulingAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  تحديد موعد الحجز
+                </h3>
+                <button
+                  onClick={closeSchedulePopup}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                <div className="text-sm text-gray-600">
+                  {schedulingAppointment.name} - {schedulingAppointment.phone}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  المنطقة الزمنية الحالية: <strong>{getUserTimezone()}</strong> ({getTimezoneOffset()})
+                </div>
+                {schedulingAppointment.scheduledAt && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    الموعد الحالي: {renderScheduledAt(schedulingAppointment.scheduledAt)}
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  تاريخ ووقت الموعد
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newScheduledDateTime}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value) {
+                      setState(prev => ({ 
+                        ...prev, 
+                        newScheduledDateTime: value 
+                      }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  سيتم حفظ الموعد بالمنطقة الزمنية المحلية
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center gap-3">
+                {schedulingAppointment.scheduledAt && (
+                  <button
+                    onClick={unscheduleAppointment}
+                    disabled={isScheduling}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-200 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {isScheduling ? "جاري الإلغاء..." : "إلغاء الموعد"}
+                  </button>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={closeSchedulePopup}
+                    disabled={isScheduling}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    onClick={scheduleAppointment}
+                    disabled={isScheduling || !newScheduledDateTime}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isScheduling ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Calendar className="h-4 w-4" />
+                    )}
+                    {isScheduling ? "جاري الحفظ..." : "حفظ الموعد"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">تأكيد الحذف</h3>
+              </div>
+              
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm text-yellow-800">
+                  هل أنت متأكد أنك تريد حذف هذا الموعد؟ هذا الإجراء لا يمكن التراجع عنه.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={closeDeleteConfirm}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={confirmDeleteAppointment}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
+                >
+                  حذف
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DataTable;
